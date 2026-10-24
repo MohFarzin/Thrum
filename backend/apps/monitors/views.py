@@ -86,10 +86,16 @@ class MonitorViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=["post"], url_path="share")
     def share(self, request, id=None):
-        """Enable / disable public status page (shareable link, no login)."""
+        """Enable / disable public status page, or rotate the share slug."""
         import secrets
 
         monitor = self.get_object()
+        if request.data.get("rotate_slug"):
+            monitor.public_slug = secrets.token_urlsafe(9)
+            monitor.is_public = True
+            monitor.save(update_fields=["is_public", "public_slug", "updated_at"])
+            return Response(MonitorSerializer(monitor).data)
+
         want = request.data.get("is_public")
         if want is None:
             want = not monitor.is_public
@@ -100,9 +106,6 @@ class MonitorViewSet(viewsets.ModelViewSet):
             monitor.is_public = True
         else:
             monitor.is_public = False
-            # Keep slug so re-enable reuses the same link; clear if asked.
-            if request.data.get("rotate_slug"):
-                monitor.public_slug = secrets.token_urlsafe(9)
         monitor.save(update_fields=["is_public", "public_slug", "updated_at"])
         return Response(MonitorSerializer(monitor).data)
 

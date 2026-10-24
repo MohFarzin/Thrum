@@ -92,13 +92,13 @@ class MonitorSerializer(serializers.ModelSerializer):
             grace = attrs.get("heartbeat_grace_seconds")
             if grace is None and self.instance is not None:
                 grace = self.instance.heartbeat_grace_seconds
-            if interval is not None and int(interval) < 30:
+            if interval is not None and int(interval) < 10:
                 raise serializers.ValidationError(
-                    {"interval_seconds": "Heartbeat interval must be at least 30 seconds."}
+                    {"interval_seconds": "Heartbeat interval must be at least 10 seconds."}
                 )
-            if grace is not None and int(grace) < 30:
+            if grace is not None and int(grace) < 10:
                 raise serializers.ValidationError(
-                    {"heartbeat_grace_seconds": "Heartbeat grace must be at least 30 seconds."}
+                    {"heartbeat_grace_seconds": "Heartbeat grace must be at least 10 seconds."}
                 )
         return attrs
 

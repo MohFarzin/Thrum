@@ -100,8 +100,8 @@ export function MonitorForm() {
                   ? {
                       ...prev,
                       type: next,
-                      interval_seconds: Math.max(prev.interval_seconds, 60),
-                      heartbeat_grace_seconds: Math.max(prev.heartbeat_grace_seconds, 120),
+                      interval_seconds: Math.max(prev.interval_seconds, 30),
+                      heartbeat_grace_seconds: Math.max(prev.heartbeat_grace_seconds, 60),
                     }
                   : { ...prev, type: next },
               )
@@ -132,7 +132,7 @@ export function MonitorForm() {
             Interval (seconds)
             <input
               type="number"
-              min={form.type === 'heartbeat' ? 30 : 10}
+              min={10}
               value={form.interval_seconds}
               onChange={(e) => set('interval_seconds', Number(e.target.value))}
             />
@@ -163,7 +163,7 @@ export function MonitorForm() {
               Heartbeat grace (seconds)
               <input
                 type="number"
-                min={30}
+                min={10}
                 value={form.heartbeat_grace_seconds}
                 onChange={(e) => set('heartbeat_grace_seconds', Number(e.target.value))}
               />

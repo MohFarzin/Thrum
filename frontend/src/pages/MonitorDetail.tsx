@@ -23,7 +23,7 @@ function fmtPct(v: number | null | undefined) {
   return `${v}%`
 }
 
-type ConfirmKind = 'delete' | 'rotate' | null
+type ConfirmKind = 'delete' | 'rotate' | 'refresh-share' | null
 
 export function MonitorDetail() {
   const { user, loading } = useAuth()
@@ -42,6 +42,7 @@ export function MonitorDetail() {
   )
   const [picked, setPicked] = useState<BarSegment | null>(null)
   const [favBusy, setFavBusy] = useState(false)
+  const [shareBusy, setShareBusy] = useState(false)
   const [confirm, setConfirm] = useState<ConfirmKind>(null)
   const [confirmBusy, setConfirmBusy] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
@@ -119,6 +120,23 @@ export function MonitorDetail() {
     }
   }
 
+  async function onToggleShare() {
+    if (!monitor || shareBusy) return
+    setShareBusy(true)
+    setError('')
+    try {
+      const updated = await api<Monitor>(`/api/monitors/${monitor.id}/share/`, {
+        method: 'POST',
+        body: JSON.stringify({ is_public: !monitor.is_public }),
+      })
+      setMonitor(updated)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Share update failed')
+    } finally {
+      setShareBusy(false)
+    }
+  }
+
   async function runConfirm() {
     if (!id || !confirm) return
     setConfirmBusy(true)
@@ -127,6 +145,15 @@ export function MonitorDetail() {
       if (confirm === 'delete') {
         await api(`/api/monitors/${id}/`, { method: 'DELETE' })
         navigate('/monitors')
+        return
+      }
+      if (confirm === 'refresh-share') {
+        const updated = await api<Monitor>(`/api/monitors/${id}/share/`, {
+          method: 'POST',
+          body: JSON.stringify({ rotate_slug: true }),
+        })
+        setMonitor(updated)
+        setConfirm(null)
         return
       }
       const res = await api<Monitor>(`/api/monitors/${id}/rotate-key/`, { method: 'POST' })
@@ -149,7 +176,12 @@ export function MonitorDetail() {
   const latest = recentList[0]
   const hbUrl = `${window.location.origin}/api/v1/heartbeat/${monitor.id}/`
   const hbKey = revealedKey || 'YOUR_API_KEY'
-  const sleepSec = Math.max(15, Math.floor(monitor.interval_seconds / 2))
+  // Agent loop: at most every 10s (safe for min interval 10s).
+  const sleepSec = Math.min(10, Math.max(5, Math.floor(monitor.interval_seconds / 2)))
+  const shareUrl =
+    monitor.is_public && monitor.public_slug
+      ? `${window.location.origin}/s/${monitor.public_slug}`
+      : null
 
   return (
     <section className="page">
@@ -275,6 +307,52 @@ export function MonitorDetail() {
         <HeartbeatBar status={monitor.status} results={results} onSelect={setPicked} />
       </div>
 
+      <div className="detail-panel">
+        <div className="row-between avail-head">
+          <h2 style={{ margin: 0 }}>Public status</h2>
+          <div className="avail-controls">
+            {monitor.is_public ? (
+              <button
+                type="button"
+                className="btn tiny ghost"
+                disabled={shareBusy || confirmBusy}
+                onClick={() => setConfirm('refresh-share')}
+              >
+                Refresh link
+              </button>
+            ) : null}
+            <button
+              type="button"
+              className="btn tiny ghost"
+              disabled={shareBusy}
+              onClick={() => void onToggleShare()}
+            >
+              {monitor.is_public ? 'Turn off' : 'Share status'}
+            </button>
+          </div>
+        </div>
+        <p className="meta">
+          Anyone with the link can see status and uptime — no login. Keys stay private.
+        </p>
+        {shareUrl ? (
+          <div className="share-line">
+            <code className="key-reveal">{shareUrl}</code>
+            <button
+              type="button"
+              className="btn tiny ghost"
+              onClick={() => void navigator.clipboard.writeText(shareUrl)}
+            >
+              Copy link
+            </button>
+            <a className="text-toggle" href={shareUrl} target="_blank" rel="noreferrer">
+              Open
+            </a>
+          </div>
+        ) : (
+          <p className="meta">Sharing is off.</p>
+        )}
+      </div>
+
       <dl className="detail-grid">
         <dt>Interval</dt>
         <dd>{monitor.interval_seconds}s</dd>
@@ -348,6 +426,16 @@ export function MonitorDetail() {
         title="Rotate API key?"
         body="The current key stops working immediately. Copy the new key when it appears."
         confirmLabel="Rotate"
+        busy={confirmBusy}
+        onCancel={() => setConfirm(null)}
+        onConfirm={() => void runConfirm()}
+      />
+      <ConfirmDialog
+        open={confirm === 'refresh-share'}
+        title="Refresh share link?"
+        body="This creates a new public URL. Anyone with the old link will lose access immediately."
+        confirmLabel="Refresh link"
+        danger
         busy={confirmBusy}
         onCancel={() => setConfirm(null)}
         onConfirm={() => void runConfirm()}

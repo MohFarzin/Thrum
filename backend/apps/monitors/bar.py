@@ -21,7 +21,8 @@ RANGE_DELTAS: dict[str, timedelta] = {
 # Always emit this many wall-clock slots (oldest → … → now).
 # 10m≈20s/slot, 1h=1m, 1d=1h, 1w≈4h, 30d=1d — keeps bars skinny and even.
 DEFAULT_BUCKETS: dict[str, int] = {
-    "10m": 30,
+    # 10s cadence → 10m = 60 slots; 1h stays 60 (1m); longer ranges unchanged.
+    "10m": 60,
     "1h": 60,
     "1d": 24,
     "7d": 42,

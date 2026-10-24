@@ -582,15 +582,20 @@ label.check {
 .modal-backdrop {
   position: fixed;
   inset: 0;
-  z-index: 80;
+  z-index: 1000;
   background: rgba(0, 0, 0, 0.62);
-  display: grid;
-  place-items: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   padding: 1rem;
+  /* Viewport-fixed; portal to body avoids parent transform trapping. */
 }
 
 .modal-card {
+  position: relative;
   width: min(24rem, 100%);
+  max-height: min(90vh, 32rem);
+  overflow: auto;
   background: var(--panel-2);
   border: 1px solid var(--line);
   border-radius: var(--radius);
