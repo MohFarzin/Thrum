@@ -1,0 +1,32 @@
+:root {
+  --bg0: #0b1210;
+  --bg1: #12201a;
+  --text: #c5d4cc;
+  --text-h: #f2f7f4;
+  --accent: #3dba7a;
+  --muted: #7a9186;
+  --sans: "Segoe UI", "Helvetica Neue", sans-serif;
+  --display: "Trebuchet MS", "Segoe UI", sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100svh;
+  font-family: var(--sans);
+  color: var(--text);
+  background:
+    radial-gradient(ellipse 80% 50% at 50% -10%, #1a3d2e 0%, transparent 55%),
+    linear-gradient(160deg, var(--bg0), var(--bg1) 60%, #0a100e);
+}
+
+#root {
+  min-height: 100svh;
+}
+
+a {
+  color: var(--accent);
+}

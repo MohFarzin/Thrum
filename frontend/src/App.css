@@ -1,0 +1,55 @@
+.shell {
+  min-height: 100svh;
+  display: grid;
+  place-items: center;
+  padding: 2rem 1.25rem;
+}
+
+.panel {
+  width: min(36rem, 100%);
+  text-align: left;
+}
+
+.brand {
+  font-family: var(--display);
+  font-size: clamp(2.75rem, 8vw, 4.5rem);
+  letter-spacing: 0.08em;
+  color: var(--text-h);
+  margin: 0 0 0.5rem;
+  font-weight: 700;
+}
+
+.tagline {
+  margin: 0 0 1.5rem;
+  color: var(--muted);
+  font-size: 1.05rem;
+}
+
+.status {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+  font-size: 0.95rem;
+}
+
+.dot {
+  width: 0.65rem;
+  height: 0.65rem;
+  border-radius: 50%;
+  background: var(--muted);
+}
+
+.dot.ok {
+  background: var(--accent);
+  box-shadow: 0 0 0 4px rgba(61, 186, 122, 0.2);
+}
+
+.dot.err {
+  background: #d65a5a;
+}
+
+.meta {
+  margin-top: 2rem;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
