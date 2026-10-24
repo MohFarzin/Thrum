@@ -28,6 +28,7 @@ export function MonitorDetail() {
     () => (location.state as { apiKey?: string } | null)?.apiKey ?? null,
   )
   const [rotating, setRotating] = useState(false)
+  const [picked, setPicked] = useState<CheckResult | null>(null)
 
   const load = useCallback(async () => {
     if (!user || !id) return
@@ -170,18 +171,38 @@ export function MonitorDetail() {
 
       <div className="detail-panel">
         <h2>Availability</h2>
-        <HeartbeatBar status={monitor.status} segments={56} results={results} />
-        <p className="meta">
-          {results.length
-            ? `Last ${results.length} checks · latest ${latest?.success ? 'OK' : 'fail'}${
-                latest?.latency_ms != null ? ` · ${latest.latency_ms}ms` : ''
-              }`
-            : canCheck
+        <p className="meta" style={{ marginBottom: '0.65rem' }}>
+          Last check {fmtTime(monitor.last_checked_at)}
+          {latest?.latency_ms != null ? ` · ${latest.latency_ms} ms` : ''}
+          {monitor.consecutive_failures > 0
+            ? ` · ${monitor.consecutive_failures} consecutive fail${monitor.consecutive_failures === 1 ? '' : 's'}`
+            : ''}
+          {' · '}
+          green OK · orange first fail · red confirmed down
+        </p>
+        <HeartbeatBar
+          status={monitor.status}
+          segments={56}
+          results={results}
+          onSelect={setPicked}
+        />
+        {picked ? (
+          <p className="meta">
+            Selected: {fmtTime(picked.checked_at)}
+            {picked.success ? ' · OK' : ' · fail'}
+            {picked.latency_ms != null ? ` · ${picked.latency_ms} ms` : ''}
+            {picked.status_code != null ? ` · HTTP ${picked.status_code}` : ''}
+            {picked.error_message ? ` · ${picked.error_message}` : ''}
+          </p>
+        ) : results.length === 0 ? (
+          <p className="meta">
+            {canCheck
               ? 'No checks yet — wait for the scheduler or hit Check now.'
               : isHeartbeat
                 ? 'Waiting for the first agent heartbeat.'
                 : 'No data yet.'}
-        </p>
+          </p>
+        ) : null}
       </div>
 
       <dl className="detail-grid">

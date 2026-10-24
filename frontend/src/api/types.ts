@@ -47,3 +47,15 @@ export type CheckResult = {
   error_message: string
   status_code: number | null
 }
+
+export type AlertChannelType = 'email' | 'discord'
+
+export type AlertChannel = {
+  id: string
+  name: string
+  type: AlertChannelType
+  config: Record<string, string>
+  is_enabled: boolean
+  created_at: string
+  updated_at: string
+}

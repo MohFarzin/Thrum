@@ -1,36 +1,86 @@
+import { useState } from 'react'
 import type { CheckResult, MonitorStatus } from '../api/types'
+
+type Tone = 'up' | 'warn' | 'down' | 'unknown'
+
+type Seg = {
+  tone: Tone
+  result?: CheckResult
+}
 
 type Props = {
   status: MonitorStatus
   segments?: number
-  /** Newest-first results; used when present instead of status placeholder. */
+  /** Newest-first results. */
   results?: CheckResult[]
+  onSelect?: (result: CheckResult | null) => void
 }
 
-/** Uptime-style segment bar from recent check results (oldest → newest left→right). */
-export function HeartbeatBar({ status, segments = 40, results }: Props) {
-  const tones: Array<'up' | 'down' | 'unknown'> = []
+function classify(results: CheckResult[] | undefined, status: MonitorStatus, segments: number): Seg[] {
   if (results && results.length > 0) {
     const chronological = [...results].reverse().slice(-segments)
+    const segs: Seg[] = []
+    let streak = 0
     for (const r of chronological) {
-      tones.push(r.success ? 'up' : 'down')
+      if (r.success) {
+        streak = 0
+        segs.push({ tone: 'up', result: r })
+      } else {
+        streak += 1
+        segs.push({ tone: streak < 2 ? 'warn' : 'down', result: r })
+      }
     }
-    while (tones.length < segments) {
-      tones.unshift('unknown')
-    }
-  } else {
-    for (let i = 0; i < segments; i++) {
-      if (status === 'unknown') tones.push('unknown')
-      else if (status === 'up') tones.push('up')
-      else tones.push(i > segments - 4 ? 'down' : 'up')
-    }
+    while (segs.length < segments) segs.unshift({ tone: 'unknown' })
+    return segs
   }
+  return Array.from({ length: segments }, (_, i) => {
+    if (status === 'unknown') return { tone: 'unknown' as const }
+    if (status === 'up') return { tone: 'up' as const }
+    return { tone: (i > segments - 4 ? 'down' : 'up') as Tone }
+  })
+}
+
+function tip(seg: Seg): string {
+  if (!seg.result) return 'No check yet'
+  const when = new Date(seg.result.checked_at).toLocaleString()
+  const parts = [when]
+  if (seg.result.success) {
+    parts.push('OK')
+    if (seg.result.latency_ms != null) parts.push(`${seg.result.latency_ms} ms`)
+    if (seg.result.status_code != null) parts.push(`HTTP ${seg.result.status_code}`)
+  } else {
+    parts.push(seg.tone === 'warn' ? 'Soft fail' : 'Down')
+    if (seg.result.latency_ms != null) parts.push(`${seg.result.latency_ms} ms`)
+    if (seg.result.status_code != null) parts.push(`HTTP ${seg.result.status_code}`)
+    if (seg.result.error_message) parts.push(seg.result.error_message)
+  }
+  return parts.join(' · ')
+}
+
+/** Uptime bar: green = ok, orange = first fail, red = confirmed fail (2+). */
+export function HeartbeatBar({ status, segments = 40, results, onSelect }: Props) {
+  const segs = classify(results, status, segments)
+  const [hover, setHover] = useState<string | null>(null)
 
   return (
-    <div className="hb-bar" aria-hidden>
-      {tones.map((tone, i) => (
-        <span key={i} className={`hb-seg hb-${tone}`} />
-      ))}
+    <div className="hb-wrap">
+      <div className="hb-bar" role="img" aria-label="Availability history">
+        {segs.map((seg, i) => (
+          <button
+            key={i}
+            type="button"
+            className={`hb-seg hb-${seg.tone}${seg.result ? ' clickable' : ''}`}
+            title={tip(seg)}
+            aria-label={tip(seg)}
+            onMouseEnter={() => setHover(tip(seg))}
+            onMouseLeave={() => setHover(null)}
+            onFocus={() => setHover(tip(seg))}
+            onBlur={() => setHover(null)}
+            onClick={() => onSelect?.(seg.result ?? null)}
+          />
+        ))}
+      </div>
+      {hover ? <p className="hb-tip meta">{hover}</p> : null}
     </div>
   )
 }

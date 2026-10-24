@@ -2,6 +2,7 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { Layout } from './components/Layout'
 import { AuthProvider } from './hooks/useAuth'
 import { ThemeProvider } from './hooks/useTheme'
+import { AlertChannels } from './pages/AlertChannels'
 import { Dashboard } from './pages/Dashboard'
 import { Landing } from './pages/Landing'
 import { Login } from './pages/Login'
@@ -26,6 +27,7 @@ export default function App() {
               <Route path="monitors/new" element={<MonitorForm />} />
               <Route path="monitors/:id" element={<MonitorDetail />} />
               <Route path="monitors/:id/edit" element={<MonitorForm />} />
+              <Route path="alerts" element={<AlertChannels />} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Route>
           </Routes>

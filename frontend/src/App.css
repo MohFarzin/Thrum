@@ -468,6 +468,11 @@ label.check {
   border-color: color-mix(in srgb, var(--warn) 30%, transparent);
 }
 
+.hb-wrap {
+  display: grid;
+  gap: 0.45rem;
+}
+
 .hb-bar {
   display: grid;
   grid-auto-flow: column;
@@ -488,16 +493,39 @@ label.check {
   border-radius: 2px;
   min-width: 0;
   opacity: 0.95;
+  padding: 0;
+  border: none;
+  background: color-mix(in srgb, var(--muted) 55%, var(--line));
+  cursor: default;
+}
+
+.hb-seg.clickable {
+  cursor: pointer;
+}
+
+.hb-seg.clickable:hover,
+.hb-seg.clickable:focus-visible {
+  filter: brightness(1.2);
+  outline: none;
 }
 
 .hb-up {
   background: linear-gradient(180deg, var(--accent-2), var(--accent));
+}
+.hb-warn {
+  background: linear-gradient(180deg, #ffc857, #e39b2d);
 }
 .hb-down {
   background: linear-gradient(180deg, #ff8f8f, var(--danger));
 }
 .hb-unknown {
   background: color-mix(in srgb, var(--muted) 55%, var(--line));
+}
+
+.hb-tip {
+  margin: 0;
+  min-height: 1.2em;
+  font-size: 0.82rem;
 }
 
 .brand-link img {
