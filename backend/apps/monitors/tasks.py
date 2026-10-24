@@ -17,26 +17,13 @@ def run_check(monitor_id: str) -> None:
 
 @shared_task(name="monitors.enqueue_due_checks", ignore_result=True)
 def enqueue_due_checks() -> int:
-    """Find HTTP/TCP monitors past their interval and enqueue one check each."""
-    now = timezone.now()
-    candidates = (
-        Monitor.objects.filter(
-            is_enabled=True,
-            type__in=[Monitor.Type.HTTP, Monitor.Type.TCP],
-        )
-        .only("id", "interval_seconds", "last_checked_at")
-        .order_by("last_checked_at")[:500]
-    )
-    count = 0
-    for monitor in candidates:
-        if monitor.last_checked_at is None or (
-            (now - monitor.last_checked_at).total_seconds() >= monitor.interval_seconds
-        ):
-            run_check.delay(str(monitor.id))
-            count += 1
-            if count >= 200:
-                break
-    return count
+    """Legacy Celery path — prefer `manage.py run_checker` on low-resource hosts."""
+    from .scheduler import due_http_tcp_ids
+
+    ids = due_http_tcp_ids(limit=200)
+    for mid in ids:
+        run_check.delay(mid)
+    return len(ids)
 
 
 @shared_task(name="monitors.heartbeat_watchdog", ignore_result=True)

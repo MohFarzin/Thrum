@@ -44,6 +44,12 @@ docker-data/
 # Local scratch for egg image builds / embedded data
 pterodactyl-data/
 
+# Agent hotpatch / temp bundles (never commit)
+_hp*/
+_hotpatch*
+_*.tgz
+_*.py
+
 # Coverage
 htmlcov/
 .coverage

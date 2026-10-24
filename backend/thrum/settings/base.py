@@ -127,24 +127,12 @@ CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOWED_ORIGINS = CSRF_TRUSTED_ORIGINS
 
 REDIS_URL = os.environ.get("REDIS_URL", "redis://redis:6379/0")
+# Celery kept for optional async alerts/tests; scheduling is manage.py run_checker.
 CELERY_BROKER_URL = REDIS_URL
 CELERY_RESULT_BACKEND = REDIS_URL
 CELERY_TASK_ALWAYS_EAGER = False
 CELERY_TIMEZONE = TIME_ZONE
-CELERY_BEAT_SCHEDULE = {
-    "enqueue-due-checks": {
-        "task": "monitors.enqueue_due_checks",
-        "schedule": 30.0,
-    },
-    "heartbeat-watchdog": {
-        "task": "monitors.heartbeat_watchdog",
-        "schedule": 30.0,
-    },
-    "cleanup-check-results-daily": {
-        "task": "monitors.cleanup_check_results",
-        "schedule": 86400.0,
-    },
-}
+CELERY_BEAT_SCHEDULE = {}
 
 CACHES = {
     "default": {

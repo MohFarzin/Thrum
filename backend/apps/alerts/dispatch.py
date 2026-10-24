@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import threading
+
 from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
@@ -33,8 +35,19 @@ def maybe_dispatch_transition(monitor: Monitor, old_status: str, new_status: str
     def _enqueue() -> None:
         from .tasks import send_alert
 
+        # Inline by default so small hosts need no Celery worker for alerts.
+        eager = getattr(settings, "CELERY_TASK_ALWAYS_EAGER", False)
         for cid in channel_ids:
-            send_alert.delay(monitor_id, str(cid), kind)
+            args = (monitor_id, str(cid), kind)
+            if eager:
+                send_alert(*args)
+            else:
+                threading.Thread(
+                    target=send_alert,
+                    args=args,
+                    daemon=True,
+                    name=f"thrum-alert-{cid}",
+                ).start()
 
     transaction.on_commit(_enqueue)
 

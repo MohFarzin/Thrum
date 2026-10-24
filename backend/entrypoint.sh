@@ -5,7 +5,7 @@ DATA_DIR="${THRUM_DATA_DIR:-/app/data}"
 SECRET_FILE="${THRUM_SECRET_FILE:-${DATA_DIR}/secret_key.txt}"
 mkdir -p "${DATA_DIR}"
 
-# Auto-generate SECRET_KEY when missing / placeholder; persist + print on first create.
+# Auto-generate SECRET_KEY when missing / placeholder; persist to file (stdout for shell capture only).
 export SECRET_KEY="$(python -m thrum.bootstrap_secret "${SECRET_FILE}")"
 
 echo "Waiting for database..."

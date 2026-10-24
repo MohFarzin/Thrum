@@ -1,5 +1,5 @@
 #!/bin/bash
-# All-in-one start: embedded Postgres + Redis + Celery + Gunicorn.
+# All-in-one start: embedded Postgres + Redis + checker + Gunicorn.
 # Re-exec without CRLF if the volume file was edited on Windows.
 if grep -q $'\r' "$0" 2>/dev/null; then
   _lf="${0}.lf"
@@ -116,11 +116,9 @@ clear_stale_pg_lock() {
 
 PG_PID=""
 REDIS_PID=""
-WORKER_PID=""
-BEAT_PID=""
+CHECKER_PID=""
 cleanup() {
-  [[ -n "${WORKER_PID}" ]] && kill "${WORKER_PID}" 2>/dev/null || true
-  [[ -n "${BEAT_PID}" ]] && kill "${BEAT_PID}" 2>/dev/null || true
+  [[ -n "${CHECKER_PID}" ]] && kill "${CHECKER_PID}" 2>/dev/null || true
   [[ -n "${REDIS_PID}" ]] && kill "${REDIS_PID}" 2>/dev/null || true
   if [[ -n "${PG_PID}" ]]; then
     pg_ctl -D "${PGDATA}" -m fast stop >/dev/null 2>&1 || kill "${PG_PID}" 2>/dev/null || true
@@ -173,16 +171,10 @@ step "Database migrate"
 python manage.py migrate --noinput
 ok "schema current"
 
-CONCURRENCY="${CELERY_CONCURRENCY:-1}"
-step "Celery worker (concurrency=${CONCURRENCY})"
-celery -A thrum worker --loglevel=WARNING --concurrency="${CONCURRENCY}" &
-WORKER_PID=$!
-ok "worker pid ${WORKER_PID}"
-
-step "Celery beat"
-celery -A thrum beat --loglevel=WARNING &
-BEAT_PID=$!
-ok "beat pid ${BEAT_PID}"
+step "Checker (sleep-until-due)"
+python manage.py run_checker &
+CHECKER_PID=$!
+ok "checker pid ${CHECKER_PID}"
 
 PORT="${SERVER_PORT:-8080}"
 WORKERS="${GUNICORN_WORKERS:-1}"
@@ -205,6 +197,7 @@ exec gunicorn thrum.wsgi:application \
   --threads "${THREADS}" \
   --timeout "${TIMEOUT}" \
   --graceful-timeout 30 \
+  --logger-class thrum.glogging.ThrumLogger \
   --access-logfile - \
   --error-logfile - \
   --capture-output

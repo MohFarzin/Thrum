@@ -7,7 +7,7 @@ from django.utils import timezone
 from rest_framework.test import APIClient
 
 from apps.monitors.keys import assign_new_key, verify_api_key
-from apps.monitors.models import Monitor
+from apps.monitors.models import CheckResult, Monitor
 from apps.monitors.services import record_heartbeat
 from apps.monitors.tasks import heartbeat_watchdog
 
@@ -96,3 +96,16 @@ class HeartbeatIngestTests(TestCase):
         heartbeat_watchdog()
         self.monitor.refresh_from_db()
         self.assertEqual(self.monitor.status, Monitor.Status.DOWN)
+
+    def test_heartbeat_history_sampled_per_interval(self):
+        self.monitor.interval_seconds = 60
+        self.monitor.save(update_fields=["interval_seconds"])
+        record_heartbeat(self.monitor)
+        record_heartbeat(self.monitor)
+        self.assertEqual(CheckResult.objects.filter(monitor=self.monitor).count(), 1)
+        # Age the history row so the next beat is due for a sample.
+        CheckResult.objects.filter(monitor=self.monitor).update(
+            checked_at=timezone.now() - timedelta(seconds=61)
+        )
+        record_heartbeat(self.monitor)
+        self.assertEqual(CheckResult.objects.filter(monitor=self.monitor).count(), 2)

@@ -95,16 +95,24 @@ export function MonitorForm() {
             value={form.type}
             onChange={(e) => {
               const next = e.target.value as MonitorType
-              setForm((prev) =>
-                next === 'heartbeat'
-                  ? {
-                      ...prev,
-                      type: next,
-                      interval_seconds: Math.max(prev.interval_seconds, 30),
-                      heartbeat_grace_seconds: Math.max(prev.heartbeat_grace_seconds, 60),
-                    }
-                  : { ...prev, type: next },
-              )
+              setForm((prev) => {
+                if (next === 'heartbeat') {
+                  return {
+                    ...prev,
+                    type: next,
+                    interval_seconds: Math.max(prev.interval_seconds, 30),
+                    heartbeat_grace_seconds: Math.max(prev.heartbeat_grace_seconds, 60),
+                  }
+                }
+                if (next === 'tcp') {
+                  return {
+                    ...prev,
+                    type: next,
+                    interval_seconds: Math.max(prev.interval_seconds, 60),
+                  }
+                }
+                return { ...prev, type: next }
+              })
             }}
           >
             <option value="http">HTTP</option>
@@ -132,10 +140,13 @@ export function MonitorForm() {
             Interval (seconds)
             <input
               type="number"
-              min={10}
+              min={form.type === 'tcp' ? 60 : 10}
               value={form.interval_seconds}
               onChange={(e) => set('interval_seconds', Number(e.target.value))}
             />
+            {form.type === 'tcp' ? (
+              <span className="meta">TCP minimum is 60s (keeps small hosts quiet).</span>
+            ) : null}
           </label>
           <label>
             Timeout (seconds)

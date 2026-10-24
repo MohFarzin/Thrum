@@ -35,15 +35,7 @@ class MonitorViewSet(viewsets.ModelViewSet):
                     "check_results",
                     queryset=CheckResult.objects.filter(checked_at__gte=since)
                     .order_by("-checked_at")
-                    .only(
-                        "id",
-                        "monitor_id",
-                        "checked_at",
-                        "success",
-                        "latency_ms",
-                        "error_message",
-                        "status_code",
-                    ),
+                    .only("id", "monitor_id", "checked_at", "success"),
                 )
             )
         return qs

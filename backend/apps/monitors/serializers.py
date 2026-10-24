@@ -53,12 +53,16 @@ class MonitorSerializer(serializers.ModelSerializer):
         ]
 
     def get_recent_results(self, obj: Monitor):
+        # List/dashboard bars only need time + success — skip fat fields (error/latency/code).
         cached = getattr(obj, "_prefetched_objects_cache", {}).get("check_results")
         if cached is not None:
             rows = list(cached)[:60]
         else:
             rows = list(obj.check_results.all()[:60])
-        return CheckResultSerializer(rows, many=True).data
+        return [
+            {"id": str(r.id), "checked_at": r.checked_at.isoformat().replace("+00:00", "Z"), "success": r.success}
+            for r in rows
+        ]
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -84,10 +88,17 @@ class MonitorSerializer(serializers.ModelSerializer):
                 parse_tcp_target(target)
             except ValueError as exc:
                 raise serializers.ValidationError({"target": str(exc)}) from exc
+        interval = attrs.get("interval_seconds")
+        if interval is None and self.instance is not None:
+            interval = self.instance.interval_seconds
+
+        # TCP probes are the noisy ones on small hosts — floor at 60s.
+        if monitor_type == Monitor.Type.TCP and interval is not None and int(interval) < 60:
+            raise serializers.ValidationError(
+                {"interval_seconds": "TCP interval must be at least 60 seconds."}
+            )
+
         if monitor_type == Monitor.Type.HEARTBEAT:
-            interval = attrs.get("interval_seconds")
-            if interval is None and self.instance is not None:
-                interval = self.instance.interval_seconds
             grace = attrs.get("heartbeat_grace_seconds")
             if grace is None and self.instance is not None:
                 grace = self.instance.heartbeat_grace_seconds
@@ -99,6 +110,10 @@ class MonitorSerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError(
                     {"heartbeat_grace_seconds": "Heartbeat grace must be at least 10 seconds."}
                 )
+        elif monitor_type == Monitor.Type.HTTP and interval is not None and int(interval) < 10:
+            raise serializers.ValidationError(
+                {"interval_seconds": "HTTP interval must be at least 10 seconds."}
+            )
         return attrs
 
     def create(self, validated_data):

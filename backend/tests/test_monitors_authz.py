@@ -41,3 +41,32 @@ class MonitorOwnershipTests(TestCase):
         self.assertEqual(res.status_code, 404)
         self.monitor.refresh_from_db()
         self.assertEqual(self.monitor.name, "Alice HTTP")
+
+    def test_tcp_interval_min_60(self):
+        self.client.login(username="alice", password="testpass123")
+        res = self.client.post(
+            "/api/monitors/",
+            {
+                "name": "MC",
+                "type": "tcp",
+                "target": "example.com:25565",
+                "interval_seconds": 15,
+                "timeout_seconds": 10,
+                "is_enabled": True,
+            },
+            format="json",
+        )
+        self.assertEqual(res.status_code, 400)
+        res_ok = self.client.post(
+            "/api/monitors/",
+            {
+                "name": "MC",
+                "type": "tcp",
+                "target": "example.com:25565",
+                "interval_seconds": 60,
+                "timeout_seconds": 10,
+                "is_enabled": True,
+            },
+            format="json",
+        )
+        self.assertEqual(res_ok.status_code, 201)
