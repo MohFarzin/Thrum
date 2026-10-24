@@ -1,0 +1,30 @@
+type Props = { size?: number; className?: string }
+
+/** Inline THRUM mark — pulse node + heartbeat (matches favicon). */
+export function BrandMark({ size = 28, className = '' }: Props) {
+  return (
+    <svg
+      className={className}
+      width={size}
+      height={size}
+      viewBox="0 0 64 64"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      aria-hidden
+    >
+      <rect width="64" height="64" rx="14" fill="#0c1f18" />
+      <rect x="2" y="2" width="60" height="60" rx="12" stroke="#1f4a38" strokeWidth="2" />
+      <circle cx="44" cy="32" r="14" stroke="#1a6b4a" strokeWidth="1.5" opacity="0.45" />
+      <circle cx="44" cy="32" r="9" stroke="#3dba7a" strokeWidth="1.5" opacity="0.7" />
+      <circle cx="44" cy="32" r="3.5" fill="#3dba7a" />
+      <path
+        d="M10 34h10l3-10 5 20 4-14 3 8h7"
+        stroke="#7dffb2"
+        strokeWidth="2.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        fill="none"
+      />
+    </svg>
+  )
+}

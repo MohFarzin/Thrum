@@ -2,132 +2,98 @@
 
 **If it has a pulse, THRUM hears it.**
 
-Open-source, self-hosted tech heartbeat monitoring — web UI, ingest API, and alerts.
+Self-hosted uptime & heartbeat monitoring — one box, open source.
 
-> Phase 1: register/login, create/edit monitors (HTTP/TCP/heartbeat). Live checks = Phase 2. Client agents = Phase 3+.
+<p align="center">
+  <img src="frontend/public/favicon.svg" alt="THRUM mark" width="72" height="72" />
+</p>
 
-## All-in-one box — just works
-
-**Everything for the THRUM server is included:** Postgres, Redis, API, workers, and the web UI.  
-You do **not** install a database or Redis. You do **not** invent a Secret Key.
-
-| You do | THRUM does |
-|--------|------------|
-| Import egg / run Compose | Starts the whole stack |
-| (Almost nothing else) | **Auto-generates** `SECRET_KEY` on first start |
-| Open the UI | Serves the app |
-
-**Client agents** (heartbeats from other machines) = **later**. This phase is server-only.
+Register → add HTTP / TCP / heartbeat monitors → see status. Alerts and remote agents come next.
 
 ---
 
-### How to run (Pterodactyl) — easiest for panel users
+## Quick start
 
-**1. Once** on the Wings/Docker host (required — Wings must *pull* an image):
+### Option A — Pterodactyl (all-in-one)
 
-```bash
-git clone https://github.com/MohFarzin/Thrum.git /tmp/thrum-build
-sudo bash /tmp/thrum-build/pterodactyl/host-bootstrap-image.sh /tmp/thrum-build
-```
+Everything runs **inside one container** (Postgres + Redis + API + Celery + UI). No separate database egg.
 
-That builds the all-in-one image and pushes it to `127.0.0.1:5000/thrum-pterodactyl:latest` (local registry). Details: [`pterodactyl/README.md`](./pterodactyl/README.md).
+| Step | Action |
+|:----:|--------|
+| 1 | On the **Wings host**, once: `sudo bash pterodactyl/host-bootstrap-image.sh /path/to/Thrum` |
+| 2 | Import [`pterodactyl/egg-thrum.json`](./pterodactyl/egg-thrum.json) |
+| 3 | Create server → image **`127.0.0.1:5000/thrum-pterodactyl:latest`** → Install → Start |
+| 4 | Open **`http://YOUR_IP:PORT/`** (use **http**, not https, unless you add TLS) |
 
-**2.** Import [`pterodactyl/egg-thrum.json`](./pterodactyl/egg-thrum.json) → create a **THRUM** server → pick Docker image **local registry** → **Install** → **Start**.  
-No Secret Key to fill.
+`SECRET_KEY` is generated automatically. See it in the panel console on first boot, or in `data/secret_key.txt`.
 
-**3.** Open the console on **first start**. You’ll see something like:
+Full notes: [`pterodactyl/README.md`](./pterodactyl/README.md).
 
-```text
-==> THRUM generated a SECRET_KEY for you
-    File:  /home/container/data/secret_key.txt
-    Value: <long-random-string>
-```
-
-**4.** Open `http://SERVER_IP:PORT/` and `http://SERVER_IP:PORT/api/health/`.
-
-**Read the key again later**
-
-- Panel **File Manager** → `data/secret_key.txt`
-- Or console: `cat /home/container/data/secret_key.txt`
-
-More detail: [`pterodactyl/README.md`](./pterodactyl/README.md).
-
----
-
-### How to run (Docker Compose)
+### Option B — Docker Compose
 
 ```bash
-cp .env.example .env
-# leave SECRET_KEY empty — THRUM generates it
-
+cp .env.example .env          # leave SECRET_KEY empty
 docker compose up --build
 ```
 
-- UI: http://localhost  
-- Health: http://localhost/api/health/  
-- First-start key: in the **api** container logs, and in volume file `data/secret_key.txt` (`docker compose exec api cat /app/data/secret_key.txt`)
+| | URL |
+|--|-----|
+| UI | http://localhost |
+| Health | http://localhost/api/health/ |
+| Secret file | `docker compose exec api cat /app/data/secret_key.txt` |
 
 ---
 
-## What is `SECRET_KEY`? (you usually don’t care)
+## What you get
 
-Django uses it to sign sessions/cookies. THRUM **creates a strong random one** the first time the server starts, **prints it once** in the console, and **saves it** to:
-
-| Runtime | File |
-|---------|------|
-| Pterodactyl egg | `/home/container/data/secret_key.txt` |
-| Docker Compose | `/app/data/secret_key.txt` (shared `app_data` volume) |
-
-Optional: set `SECRET_KEY` yourself in the panel or `.env` if you already have one — THRUM will use yours. Leave it blank for auto.
+- **All-in-one** or Compose — your choice  
+- **Auth** — register / login / logout  
+- **Monitors** — HTTP, TCP, heartbeat (CRUD)  
+- **Auto secret** — no copying random keys by hand  
+- Coming soon: live checks, Discord/email alerts, agent heartbeats  
 
 ---
 
 ## Architecture
 
 ```text
-Server (this repo):  UI + API + Postgres + Redis + Celery   ← you run this now
-Clients (later):     heartbeat agents on other machines
+┌─────────────────────────────────────────┐
+│  THRUM server                           │
+│  React UI · Django API · Celery         │
+│  Postgres · Redis                       │
+└─────────────────────────────────────────┘
+          ▲
+          │  heartbeats (later)
+   clients / game servers / CI
 ```
 
-## Features (v1 roadmap)
-
-- HTTP / TCP / heartbeat monitors  
-- Status history + retention  
-- Email + Discord alerts on down/recovery  
-- Per-monitor API keys (hashed at rest)  
-
-### Roadmap (not in v1)
-
-Telegram / WhatsApp, Medium/High agent tiers, Quicktunnel, Kastora — README-only for now.
-
-## Creating monitors / Discord / heartbeat curl
-
-After Phases 1–4. See `docs/simple-api.md`.
+---
 
 ## Environment
 
-Egg: almost nothing required.  
-Compose: copy `.env.example` → `.env` (empty `SECRET_KEY` is OK). See that file for optional SMTP / hosts / retention.
+Egg users: almost nothing to fill in.
 
-## Dev setup
+Compose: see [`.env.example`](./.env.example). Empty `SECRET_KEY` → auto-generated.
 
-Compose (above), or UI-only: `cd frontend && npm install && npm run dev`.
+---
 
-## Security notes
+## Security
 
-- Don’t commit real secrets or `.env`  
-- Don’t share `secret_key.txt` publicly  
-- API keys hashed at rest (Phase 3); SSRF hardening (Phase 5) — see `docs/security.md`
+- Never commit `.env` or `secret_key.txt`  
+- API keys will be hashed at rest (Phase 3)  
+- More in [`docs/security.md`](./docs/security.md)
 
-## Updating / backup
+---
 
-- **Compose:** volumes `postgres_data` + `app_data` (includes `secret_key.txt`)  
-- **Egg:** back up `/home/container/data/` (Postgres + Redis + secret)
+## Backup
 
-## Production note
+| Runtime | What to back up |
+|---------|-----------------|
+| Compose | volumes `postgres_data`, `app_data` |
+| Egg | `/home/container/data/` |
 
-Domain + TLS in front when you’re ready. Quicktunnel later for no public IP.
+---
 
 ## License
 
-MIT — see `LICENSE`.
+MIT — see [`LICENSE`](./LICENSE).

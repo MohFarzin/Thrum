@@ -1,7 +1,18 @@
 #!/bin/bash
 # All-in-one start: embedded Postgres + Redis + Celery + Gunicorn.
-# No external DATABASE_URL / REDIS_URL required.
 set -euo pipefail
+
+banner() {
+  echo ""
+  echo "  =========================================="
+  echo "             THRUM  ·  heartbeat"
+  echo "  =========================================="
+  echo ""
+}
+
+step() { echo "  > $*"; }
+ok()   { echo "    OK  $*"; }
+warn() { echo "    !!  $*" >&2; }
 
 cd /home/container
 export HOME=/home/container
@@ -9,6 +20,8 @@ export PATH="/home/container/.local/bin:${PATH}"
 export PYTHONPATH="/home/container/backend:${PYTHONPATH:-}"
 export DJANGO_SETTINGS_MODULE="${DJANGO_SETTINGS_MODULE:-thrum.settings.production}"
 export PYTHONUNBUFFERED=1
+
+banner
 
 # shellcheck disable=SC1091
 source /home/container/pterodactyl/nss-wrap.sh
@@ -19,33 +32,32 @@ REDIS_DIR="${DATA_DIR}/redis"
 SECRET_FILE="${DATA_DIR}/secret_key.txt"
 mkdir -p "${PGDATA}" "${REDIS_DIR}"
 
-# Auto SECRET_KEY — noob-friendly: generated on first start, saved to a file + printed once.
+step "Secret key"
 export SECRET_KEY="$(
   cd /home/container/backend
   python -m thrum.bootstrap_secret "${SECRET_FILE}"
 )"
+ok "ready (${SECRET_FILE})"
 
-# Locate Debian Postgres binaries (version varies by image).
 if [[ -z "${PG_BIN:-}" ]]; then
   PG_BIN="$(dirname "$(find /usr/lib/postgresql -type f -name initdb 2>/dev/null | head -n 1)")"
 fi
 if [[ -z "${PG_BIN}" || ! -x "${PG_BIN}/initdb" ]]; then
-  echo "Postgres binaries not found. Use the thrum-pterodactyl Docker image." >&2
+  warn "Postgres binaries missing — rebuild thrum-pterodactyl image"
   exit 1
 fi
 export PATH="${PG_BIN}:${PATH}"
 
-# Embedded URLs — always local to this container.
 export DATABASE_URL="${DATABASE_URL:-postgres://thrum@127.0.0.1:5432/thrum}"
 export REDIS_URL="${REDIS_URL:-redis://127.0.0.1:6379/0}"
 
 if [[ -d .git ]] && [[ "${AUTO_UPDATE:-0}" == "1" ]]; then
-  echo "==> git pull"
-  git pull --ff-only || echo "git pull failed; continuing with existing files"
+  step "Updating from git"
+  git pull --ff-only && ok "up to date" || warn "git pull skipped"
 fi
 
 if [[ ! -d frontend/dist ]]; then
-  echo "frontend/dist missing — reinstall the server (egg install builds the UI)" >&2
+  warn "frontend/dist missing — Reinstall the server from the panel"
   exit 1
 fi
 
@@ -63,7 +75,7 @@ cleanup() {
 }
 trap cleanup EXIT INT TERM
 
-echo "==> Redis (embedded)"
+step "Redis"
 redis-server \
   --bind 127.0.0.1 \
   --port 6379 \
@@ -73,10 +85,11 @@ redis-server \
   --appendonly no &
 REDIS_PID=$!
 sleep 1
+ok "listening on 127.0.0.1:6379"
 
-echo "==> Postgres (embedded)"
+step "Postgres"
 if [[ ! -f "${PGDATA}/PG_VERSION" ]]; then
-  echo "Initializing Postgres data directory…"
+  echo "    ... first boot, initializing data dir"
   initdb -D "${PGDATA}" --username=thrum --auth-local=trust --auth-host=trust --encoding=UTF8 --locale=C
   {
     echo "listen_addresses = '127.0.0.1'"
@@ -88,36 +101,53 @@ fi
 postgres -D "${PGDATA}" -h 127.0.0.1 -p 5432 -k "${DATA_DIR}" &
 PG_PID=$!
 
-echo "Waiting for Postgres…"
 for i in $(seq 1 60); do
   if pg_isready -h 127.0.0.1 -p 5432 -U thrum >/dev/null 2>&1; then
     break
   fi
   sleep 1
 done
-pg_isready -h 127.0.0.1 -p 5432 -U thrum
-
-# Create DB on first boot (ignore if it already exists).
+pg_isready -h 127.0.0.1 -p 5432 -U thrum >/dev/null
 createdb -h 127.0.0.1 -p 5432 -U thrum thrum 2>/dev/null || true
+ok "listening on 127.0.0.1:5432"
 
 cd /home/container/backend
 
-echo "==> migrate"
+step "Database migrate"
 python manage.py migrate --noinput
+ok "schema current"
 
 CONCURRENCY="${CELERY_CONCURRENCY:-1}"
-echo "==> celery worker (concurrency=${CONCURRENCY})"
-celery -A thrum worker --loglevel=INFO --concurrency="${CONCURRENCY}" &
+step "Celery worker (concurrency=${CONCURRENCY})"
+celery -A thrum worker --loglevel=WARNING --concurrency="${CONCURRENCY}" &
 WORKER_PID=$!
+ok "worker pid ${WORKER_PID}"
 
-echo "==> celery beat"
-celery -A thrum beat --loglevel=INFO &
+step "Celery beat"
+celery -A thrum beat --loglevel=WARNING &
 BEAT_PID=$!
+ok "beat pid ${BEAT_PID}"
 
 PORT="${SERVER_PORT:-8080}"
-echo "==> gunicorn on 0.0.0.0:${PORT}"
-echo "THRUM all-in-one ready (Postgres + Redis + API inside this container)."
+WORKERS="${GUNICORN_WORKERS:-1}"
+TIMEOUT="${GUNICORN_TIMEOUT:-120}"
+
+echo ""
+echo "  ------------------------------------------"
+echo "  Ready"
+echo "    UI / API  ->  http://0.0.0.0:${PORT}/"
+echo "    Health    ->  http://0.0.0.0:${PORT}/api/health/"
+echo "    Secret    ->  ${SECRET_FILE}"
+echo "  ------------------------------------------"
+echo "  Tip: use http:// (not https) on the allocation port."
+echo ""
+
 exec gunicorn thrum.wsgi:application \
   --bind "0.0.0.0:${PORT}" \
-  --workers "${GUNICORN_WORKERS:-2}" \
-  --timeout 60
+  --workers "${WORKERS}" \
+  --threads 2 \
+  --timeout "${TIMEOUT}" \
+  --graceful-timeout 30 \
+  --access-logfile - \
+  --error-logfile - \
+  --capture-output

@@ -1,14 +1,20 @@
 :root {
-  --bg0: #0b1210;
-  --bg1: #12201a;
-  --text: #c5d4cc;
-  --text-h: #f2f7f4;
+  --bg0: #070b09;
+  --bg1: #0e1612;
+  --panel: #121c17;
+  --panel-2: #16221c;
+  --text: #c8d6ce;
+  --text-h: #f3faf6;
   --accent: #3dba7a;
-  --muted: #7a9186;
-  --danger: #d65a5a;
+  --accent-2: #7dffb2;
+  --muted: #7d9488;
+  --danger: #e85d5d;
+  --warn: #c9a227;
   --line: #24352c;
-  --sans: "Segoe UI", "Helvetica Neue", sans-serif;
-  --display: "Trebuchet MS", "Segoe UI", sans-serif;
+  --shadow: 0 18px 50px rgba(0, 0, 0, 0.35);
+  --radius: 14px;
+  --sans: "DM Sans", "Segoe UI", sans-serif;
+  --display: "Syne", "Trebuchet MS", sans-serif;
 }
 
 * {
@@ -20,22 +26,40 @@ body {
   min-height: 100svh;
   font-family: var(--sans);
   color: var(--text);
-  background:
-    radial-gradient(ellipse 80% 50% at 50% -10%, #1a3d2e 0%, transparent 55%),
-    linear-gradient(160deg, var(--bg0), var(--bg1) 60%, #0a100e);
+  background: var(--bg0);
+  -webkit-font-smoothing: antialiased;
 }
 
 a {
   color: var(--accent);
 }
 
-h1 {
+h1,
+h2,
+h3 {
   font-family: var(--display);
   color: var(--text-h);
-  margin: 0 0 0.75rem;
+  margin: 0 0 0.5rem;
+  letter-spacing: -0.02em;
+}
+
+h1 {
+  font-size: clamp(1.85rem, 4vw, 2.4rem);
+  font-weight: 700;
+}
+
+h2 {
+  font-weight: 650;
+}
+
+h3 {
+  font-size: 1.05rem;
+  font-weight: 650;
+  margin: 0;
 }
 
 code {
-  font-size: 0.9em;
+  font-size: 0.88em;
   word-break: break-all;
+  color: var(--accent-2);
 }

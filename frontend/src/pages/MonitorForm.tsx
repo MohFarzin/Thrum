@@ -79,7 +79,8 @@ export function MonitorForm() {
   }
 
   return (
-    <section className="form-panel wide">
+    <section className="form-panel wide page">
+      <p className="eyebrow">{editing ? 'Update' : 'Create'}</p>
       <h1>{editing ? 'Edit monitor' : 'New monitor'}</h1>
       <form onSubmit={onSubmit}>
         <label>

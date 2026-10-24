@@ -25,6 +25,9 @@ frontend/dist/
 *.log
 npm-debug.log*
 
+# Local-only build brief (agents use it; never publish)
+thrum-plan.txt
+
 # IDE / OS / Cursor (local agent rules — never push)
 .cursor/
 .idea/

@@ -29,7 +29,8 @@ export function Register() {
 
   return (
     <section className="form-panel">
-      <h1>Register</h1>
+      <p className="eyebrow">Get started</p>
+      <h1>Create account</h1>
       <form onSubmit={onSubmit}>
         <label>
           Username

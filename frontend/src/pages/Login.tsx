@@ -28,6 +28,7 @@ export function Login() {
 
   return (
     <section className="form-panel">
+      <p className="eyebrow">Welcome back</p>
       <h1>Log in</h1>
       <form onSubmit={onSubmit}>
         <label>

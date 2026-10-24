@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react'
 import { Link, Navigate, useNavigate, useParams } from 'react-router-dom'
 import { api } from '../api/client'
 import type { Monitor } from '../api/types'
+import { HeartbeatBar } from '../components/HeartbeatBar'
+import { StatusPill } from '../components/StatusPill'
 import { useAuth } from '../hooks/useAuth'
 
 export function MonitorDetail() {
@@ -18,7 +20,7 @@ export function MonitorDetail() {
       .catch((err) => setError(err instanceof Error ? err.message : 'Failed to load'))
   }, [user, id])
 
-  if (loading) return <p>Loading…</p>
+  if (loading) return <p className="meta">Loading…</p>
   if (!user) return <Navigate to="/login" replace />
 
   async function onDelete() {
@@ -28,13 +30,21 @@ export function MonitorDetail() {
   }
 
   if (error) return <p className="error">{error}</p>
-  if (!monitor) return <p>Loading…</p>
+  if (!monitor) return <p className="meta">Loading…</p>
 
   return (
-    <section>
-      <div className="row-between">
-        <h1>{monitor.name}</h1>
+    <section className="page">
+      <Link className="back-link" to="/monitors">
+        ← Monitors
+      </Link>
+      <div className="detail-hero">
+        <div>
+          <p className="eyebrow">{monitor.type}</p>
+          <h1>{monitor.name}</h1>
+          <p className="lede truncate">{monitor.target || 'Heartbeat-only monitor'}</p>
+        </div>
         <div className="actions">
+          <StatusPill status={monitor.status} />
           <Link className="btn ghost" to={`/monitors/${monitor.id}/edit`}>
             Edit
           </Link>
@@ -43,15 +53,14 @@ export function MonitorDetail() {
           </button>
         </div>
       </div>
-      <p>
-        <span className={`dot status-${monitor.status}`} />
-        <strong className={`status-${monitor.status}`}>{monitor.status}</strong>
-        <span className="muted"> · {monitor.type}</span>
-        {!monitor.is_enabled ? <span className="muted"> · disabled</span> : null}
-      </p>
+
+      <div className="detail-panel">
+        <h2>Availability</h2>
+        <HeartbeatBar status={monitor.status} segments={56} />
+        <p className="meta">History bars fill in once Phase 2 checks are live.</p>
+      </div>
+
       <dl className="detail-grid">
-        <dt>Target</dt>
-        <dd>{monitor.target || '—'}</dd>
         <dt>Interval</dt>
         <dd>{monitor.interval_seconds}s</dd>
         <dt>Timeout</dt>
@@ -74,15 +83,13 @@ export function MonitorDetail() {
         <dd>{monitor.last_heartbeat_at || '—'}</dd>
         <dt>Failures</dt>
         <dd>{monitor.consecutive_failures}</dd>
+        <dt>Enabled</dt>
+        <dd>{monitor.is_enabled ? 'Yes' : 'No'}</dd>
         <dt>ID</dt>
         <dd>
           <code>{monitor.id}</code>
         </dd>
       </dl>
-      <p className="meta">
-        Checks and API keys arrive in later phases. This page is the CRUD shell.
-      </p>
-      <Link to="/monitors">← Back to monitors</Link>
     </section>
   )
 }
