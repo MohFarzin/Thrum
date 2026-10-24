@@ -1,1 +1,1 @@
-# Accounts models land in Phase 1 if needed beyond Django User.
+# Uses Django's built-in User model.

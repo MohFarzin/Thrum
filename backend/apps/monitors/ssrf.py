@@ -18,8 +18,8 @@ _BLOCKED_HOSTNAMES = frozenset(
 
 
 def _ip_blocked(ip: ipaddress.IPv4Address | ipaddress.IPv6Address) -> bool:
-    # Cloud metadata / link-local; allow private LAN (common for self-host checks).
-    if ip.is_link_local or ip.is_multicast or ip.is_unspecified:
+    # Block loopback/link-local/metadata; private LAN stays allowed for self-host checks.
+    if ip.is_loopback or ip.is_link_local or ip.is_multicast or ip.is_unspecified:
         return True
     if isinstance(ip, ipaddress.IPv4Address) and ip == ipaddress.IPv4Address("169.254.169.254"):
         return True
@@ -30,6 +30,8 @@ def assert_safe_hostname(host: str) -> None:
     host = (host or "").strip().lower().rstrip(".")
     if not host:
         raise ValueError("Empty host")
+    if host in ("localhost", "localhost.localdomain") or host.endswith(".localhost"):
+        raise ValueError("Blocked host")
     if host in _BLOCKED_HOSTNAMES or host.endswith(".metadata.google.internal"):
         raise ValueError("Blocked host")
 

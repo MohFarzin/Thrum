@@ -207,10 +207,9 @@ export function AlertChannels() {
                   <p className="muted truncate">
                     {ch.type === 'email'
                       ? `${ch.config.to || 'email'}${ch.config.smtp_host ? ` · ${ch.config.smtp_host}` : ''}`
-                      : (ch.config.webhook_url || '').replace(
-                          /^(https:\/\/discord\.com\/api\/webhooks\/)[^/]+/,
-                          '$1…',
-                        )}
+                      : ch.config.webhook_url_set || ch.config.webhook_url === '********'
+                        ? 'Discord webhook · set'
+                        : 'Discord webhook'}
                   </p>
                 </div>
                 <span className="type-chip">{ch.type}</span>

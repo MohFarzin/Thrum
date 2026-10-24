@@ -1,4 +1,4 @@
-"""Simple-tier heartbeat ingest (no session auth — API key only)."""
+"""Heartbeat ingest — API key auth only (no session / CSRF)."""
 
 from __future__ import annotations
 
@@ -15,7 +15,8 @@ from apps.monitors.models import Monitor
 from apps.monitors.services import record_heartbeat
 
 MAX_BODY = 64 * 1024
-RATE_LIMIT = 120  # per monitor per minute
+RATE_LIMIT = 120  # successful beats per monitor per minute
+AUTH_FAIL_LIMIT = 60  # failed auth attempts per monitor per minute
 
 
 def _extract_key(request) -> str:
@@ -25,13 +26,14 @@ def _extract_key(request) -> str:
     return (request.headers.get("X-Thrum-Key") or "").strip()
 
 
-def _rate_limited(monitor_id: str) -> bool:
-    key = f"thrum:hb:{monitor_id}"
-    n = cache.get(key, 0)
-    if n >= RATE_LIMIT:
-        return True
-    cache.set(key, n + 1, timeout=60)
-    return False
+def _over_limit(key: str, limit: int) -> bool:
+    if cache.add(key, 1, timeout=60):
+        return False
+    try:
+        return cache.incr(key) > limit
+    except ValueError:
+        cache.set(key, 1, timeout=60)
+        return False
 
 
 @method_decorator(csrf_exempt, name="dispatch")
@@ -49,11 +51,14 @@ class HeartbeatIngestView(View):
         if not monitor.is_enabled:
             return JsonResponse({"detail": "Monitor disabled"}, status=400)
 
+        mid = str(monitor.id)
         api_key = _extract_key(request)
         if not verify_api_key(api_key, monitor.api_key_hash):
+            if _over_limit(f"thrum:hb:fail:{mid}", AUTH_FAIL_LIMIT):
+                return JsonResponse({"detail": "Rate limit exceeded"}, status=429)
             return JsonResponse({"detail": "Unauthorized"}, status=401)
 
-        if _rate_limited(str(monitor.id)):
+        if _over_limit(f"thrum:hb:{mid}", RATE_LIMIT):
             return JsonResponse({"detail": "Rate limit exceeded"}, status=429)
 
         message = ""

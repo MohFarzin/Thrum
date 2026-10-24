@@ -2,6 +2,8 @@
 .env
 .env.local
 *.pem
+data/
+**/secret_key.txt
 
 # Python
 __pycache__/

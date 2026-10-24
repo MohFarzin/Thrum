@@ -83,7 +83,7 @@ export type AlertChannel = {
   id: string
   name: string
   type: AlertChannelType
-  config: Record<string, string>
+  config: Record<string, string | boolean | number>
   is_enabled: boolean
   created_at: string
   updated_at: string

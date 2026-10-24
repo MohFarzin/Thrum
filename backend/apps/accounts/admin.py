@@ -1,1 +1,1 @@
-# Using Django's built-in User admin.
+# Default Django User admin is enough for v1.

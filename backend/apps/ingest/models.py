@@ -1,1 +1,1 @@
-# Ingest has no models in v1; heartbeat views land in Phase 3.
+# No models — heartbeat lives in monitors + ingest views.

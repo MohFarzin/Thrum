@@ -15,19 +15,22 @@ REGISTER_LIMIT = 10
 
 
 def _client_ip(request: Request) -> str:
-    forwarded = request.META.get("HTTP_X_FORWARDED_FOR", "")
-    if forwarded:
-        return forwarded.split(",")[0].strip() or "unknown"
+    # Prefer nginx X-Real-IP — never trust leftmost X-Forwarded-For (spoofable).
+    real = (request.META.get("HTTP_X_REAL_IP") or "").strip()
+    if real:
+        return real
     return request.META.get("REMOTE_ADDR") or "unknown"
 
 
 def _rate_limited(bucket: str, limit: int) -> bool:
     key = f"thrum:auth:{bucket}"
-    n = cache.get(key, 0)
-    if n >= limit:
-        return True
-    cache.set(key, n + 1, timeout=60)
-    return False
+    if cache.add(key, 1, timeout=60):
+        return False
+    try:
+        return cache.incr(key) > limit
+    except ValueError:
+        cache.set(key, 1, timeout=60)
+        return False
 
 
 @api_view(["GET"])

@@ -1,8 +1,18 @@
+from urllib.parse import urlparse
+
 from rest_framework import serializers
 
 from .models import AlertChannel
 
-_SECRET_KEYS = ("smtp_password",)
+_SECRET_KEYS = ("smtp_password", "webhook_url")
+_DISCORD_HOST_SUFFIXES = (".discord.com", ".discordapp.com")
+
+
+def _discord_webhook_ok(url: str) -> bool:
+    host = (urlparse(url).hostname or "").lower()
+    if host in ("discord.com", "discordapp.com"):
+        return True
+    return any(host.endswith(suf) for suf in _DISCORD_HOST_SUFFIXES)
 
 
 class AlertChannelSerializer(serializers.ModelSerializer):
@@ -30,13 +40,13 @@ class AlertChannelSerializer(serializers.ModelSerializer):
         if channel_type == AlertChannel.Type.EMAIL:
             if not (config.get("to") or "").strip():
                 raise serializers.ValidationError({"config": "Email channels need config.to"})
-            # Allow channel SMTP or server EMAIL_HOST at send time.
         elif channel_type == AlertChannel.Type.DISCORD:
             url = (config.get("webhook_url") or "").strip()
-            if not url.startswith("https://"):
+            if not url.startswith("https://") or not _discord_webhook_ok(url):
                 raise serializers.ValidationError(
-                    {"config": "Discord channels need https config.webhook_url"}
+                    {"config": "Discord channels need an https discord.com / discordapp.com webhook_url"}
                 )
+            config["webhook_url"] = url
         attrs["config"] = config
         return attrs
 
@@ -59,5 +69,10 @@ class AlertChannelSerializer(serializers.ModelSerializer):
             cfg["smtp_password_set"] = True
         else:
             cfg["smtp_password_set"] = False
+        if cfg.get("webhook_url"):
+            cfg["webhook_url"] = "********"
+            cfg["webhook_url_set"] = True
+        else:
+            cfg["webhook_url_set"] = False
         data["config"] = cfg
         return data

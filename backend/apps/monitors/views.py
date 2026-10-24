@@ -163,7 +163,7 @@ def public_status(request, slug: str):
         {
             "name": monitor.name,
             "type": monitor.type,
-            "target": monitor.target,
+            # Intentionally omit target — share links must not leak internal hosts/URLs.
             "status": monitor.status,
             "last_checked_at": monitor.last_checked_at,
             "interval_seconds": monitor.interval_seconds,

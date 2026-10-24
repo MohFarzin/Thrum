@@ -176,7 +176,6 @@ export function MonitorDetail() {
   const latest = recentList[0]
   const hbUrl = `${window.location.origin}/api/v1/heartbeat/${monitor.id}/`
   const hbKey = revealedKey || 'YOUR_API_KEY'
-  // Agent loop: at most every 10s (safe for min interval 10s).
   const sleepSec = Math.min(10, Math.max(5, Math.floor(monitor.interval_seconds / 2)))
   const shareUrl =
     monitor.is_public && monitor.public_slug

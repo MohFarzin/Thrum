@@ -48,16 +48,12 @@ MIDDLEWARE = [
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
 
-# Repo root is parent of backend/ (Compose + Pterodactyl layouts).
 REPO_ROOT = BASE_DIR.parent
 _SPA_DIST = REPO_ROOT / "frontend" / "dist"
-# Egg / single-process mode: serve the built React app from Django (no Nginx).
 if _SPA_DIST.is_dir():
     WHITENOISE_ROOT = str(_SPA_DIST)
     WHITENOISE_INDEX_FILE = True
-    # Hot-patched frontend/dist must be visible without a process restart.
-    # Without this, SpaIndexView serves fresh index.html pointing at a new JS
-    # hash while WhiteNoise still only knows the old assets → black screen on refresh.
+    # Autorefresh so hot-patched dist hashes match SpaIndexView (avoids black-screen refresh).
     WHITENOISE_AUTOREFRESH = os.environ.get("WHITENOISE_AUTOREFRESH", "1").lower() in (
         "1",
         "true",
@@ -123,9 +119,7 @@ REST_FRAMEWORK = {
     ],
 }
 
-# Auth choice (locked for UI): Django session + DRF SessionAuthentication.
-# SPA will use same-origin cookies via the reverse proxy.
-CSRF_COOKIE_HTTPONLY = False  # SPA reads csrftoken for X-CSRFToken header
+CSRF_COOKIE_HTTPONLY = False  # SPA must read csrftoken for X-CSRFToken
 SESSION_COOKIE_SAMESITE = "Lax"
 CSRF_COOKIE_SAMESITE = "Lax"
 

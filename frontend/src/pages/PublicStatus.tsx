@@ -8,7 +8,6 @@ import { StatusPill } from '../components/StatusPill'
 type PublicPayload = {
   name: string
   type: string
-  target: string
   status: MonitorStatus
   last_checked_at: string | null
   interval_seconds: number
@@ -64,7 +63,6 @@ export function PublicStatus() {
         <div>
           <p className="eyebrow">Public status · {data.type}</p>
           <h1>{data.name}</h1>
-          <p className="lede truncate">{data.target || 'Heartbeat'}</p>
         </div>
         <StatusPill status={data.status} />
       </div>
