@@ -43,6 +43,8 @@ class Monitor(models.Model):
     last_heartbeat_at = models.DateTimeField(null=True, blank=True)
     consecutive_failures = models.PositiveIntegerField(default=0)
     is_enabled = models.BooleanField(default=True)
+    is_favorite = models.BooleanField(default=False)
+    favorited_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -53,6 +55,7 @@ class Monitor(models.Model):
             models.Index(fields=["status"]),
             models.Index(fields=["last_checked_at"]),
             models.Index(fields=["type"]),
+            models.Index(fields=["owner", "is_favorite"]),
         ]
 
     def __str__(self) -> str:

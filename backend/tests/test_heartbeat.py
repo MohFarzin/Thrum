@@ -47,6 +47,13 @@ class HeartbeatIngestTests(TestCase):
         self.assertEqual(self.monitor.status, Monitor.Status.UP)
         self.assertIsNotNone(self.monitor.last_heartbeat_at)
 
+    def test_empty_body_ok(self):
+        """PowerShell-safe agents POST with no body (JSON quoting is shell hell)."""
+        url = f"/api/v1/heartbeat/{self.monitor.id}/"
+        res = self.client.post(url, data=b"", content_type="application/octet-stream", HTTP_AUTHORIZATION=f"Bearer {self.raw_key}")
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res.json(), {"ok": True})
+
     def test_x_thrum_key_header(self):
         url = f"/api/v1/heartbeat/{self.monitor.id}/"
         res = self.client.post(url, {}, format="json", HTTP_X_THRUM_KEY=self.raw_key)

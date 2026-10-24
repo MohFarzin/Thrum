@@ -94,13 +94,13 @@
 }
 
 .page {
-  animation: rise 0.45s ease both;
+  animation: rise 0.28s ease both;
 }
 
 @keyframes rise {
   from {
     opacity: 0;
-    transform: translateY(8px);
+    transform: translateY(4px);
   }
   to {
     opacity: 1;
@@ -670,4 +670,118 @@ label.check {
   height: 0.55rem;
   border-radius: 50%;
   display: inline-block;
+}
+
+.card-actions,
+.preview-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-width: 0;
+}
+
+.preview-card.live {
+  text-decoration: none;
+  color: inherit;
+  transition: border-color 0.2s ease, transform 0.2s ease;
+}
+
+.preview-card.live:hover {
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--line));
+  transform: translateY(-2px);
+}
+
+.star-btn {
+  appearance: none;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  font-size: 1.05rem;
+  line-height: 1;
+  padding: 0.15rem 0.25rem;
+  cursor: pointer;
+  opacity: 0.55;
+  transition: color 0.15s ease, opacity 0.15s ease, transform 0.15s ease;
+}
+
+.star-btn:hover:not(:disabled) {
+  opacity: 1;
+  color: var(--warn);
+  transform: scale(1.08);
+}
+
+.star-btn.on {
+  color: var(--warn);
+  opacity: 1;
+}
+
+.star-btn.lg {
+  font-size: 1.25rem;
+}
+
+.star-btn:disabled {
+  cursor: wait;
+}
+
+.range-tabs {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  padding: 0.2rem;
+  border-radius: 9px;
+  border: 1px solid var(--line);
+  background: color-mix(in srgb, var(--panel) 80%, transparent);
+}
+
+.range-tab {
+  appearance: none;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  padding: 0.28rem 0.55rem;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.range-tab:hover {
+  color: var(--text-h);
+}
+
+.range-tab.on {
+  color: var(--text-h);
+  background: color-mix(in srgb, var(--accent) 18%, var(--panel));
+}
+
+.text-toggle {
+  appearance: none;
+  border: none;
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  font-size: 0.82rem;
+  text-decoration: underline;
+  text-underline-offset: 0.18em;
+  cursor: pointer;
+  padding: 0;
+}
+
+a.text-toggle {
+  text-decoration: underline;
+}
+
+.text-toggle:hover {
+  color: var(--accent-2);
+}
+
+.landing-more {
+  margin: 0.25rem 0 0;
+  font-size: 0.85rem;
+}
+
+.landing-more a {
+  color: var(--accent-2);
 }

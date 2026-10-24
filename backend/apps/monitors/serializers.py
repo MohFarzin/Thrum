@@ -25,6 +25,8 @@ class MonitorSerializer(serializers.ModelSerializer):
             "last_heartbeat_at",
             "consecutive_failures",
             "is_enabled",
+            "is_favorite",
+            "favorited_at",
             "created_at",
             "updated_at",
             "api_key_prefix",
@@ -37,6 +39,8 @@ class MonitorSerializer(serializers.ModelSerializer):
             "last_checked_at",
             "last_heartbeat_at",
             "consecutive_failures",
+            "is_favorite",
+            "favorited_at",
             "created_at",
             "updated_at",
             "api_key_prefix",
@@ -45,12 +49,12 @@ class MonitorSerializer(serializers.ModelSerializer):
         ]
 
     def get_recent_results(self, obj: Monitor):
-        # Prefetched in the viewset when available.
+        # Prefetched in the viewset when available. Cap covers ~1h at 30s interval.
         cached = getattr(obj, "_prefetched_objects_cache", {}).get("check_results")
         if cached is not None:
-            rows = list(cached)[:40]
+            rows = list(cached)[:120]
         else:
-            rows = list(obj.check_results.all()[:40])
+            rows = list(obj.check_results.all()[:120])
         return CheckResultSerializer(rows, many=True).data
 
     def __init__(self, *args, **kwargs):

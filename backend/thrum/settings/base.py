@@ -55,6 +55,14 @@ _SPA_DIST = REPO_ROOT / "frontend" / "dist"
 if _SPA_DIST.is_dir():
     WHITENOISE_ROOT = str(_SPA_DIST)
     WHITENOISE_INDEX_FILE = True
+    # Hot-patched frontend/dist must be visible without a process restart.
+    # Without this, SpaIndexView serves fresh index.html pointing at a new JS
+    # hash while WhiteNoise still only knows the old assets → black screen on refresh.
+    WHITENOISE_AUTOREFRESH = os.environ.get("WHITENOISE_AUTOREFRESH", "1").lower() in (
+        "1",
+        "true",
+        "yes",
+    )
 
 ROOT_URLCONF = "thrum.urls"
 

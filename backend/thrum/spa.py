@@ -15,4 +15,7 @@ class SpaIndexView(View):
         index = Path(root) / "index.html"
         if not index.is_file():
             raise Http404("index.html missing")
-        return FileResponse(index.open("rb"), content_type="text/html")
+        response = FileResponse(index.open("rb"), content_type="text/html; charset=utf-8")
+        # Always revalidate — must match the current asset hashes on disk.
+        response["Cache-Control"] = "no-store"
+        return response

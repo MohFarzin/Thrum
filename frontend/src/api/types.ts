@@ -30,6 +30,8 @@ export type Monitor = {
   last_heartbeat_at: string | null
   consecutive_failures: number
   is_enabled: boolean
+  is_favorite: boolean
+  favorited_at: string | null
   created_at: string
   updated_at: string
   api_key_prefix: string

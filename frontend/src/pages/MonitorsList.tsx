@@ -1,15 +1,17 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type MouseEvent } from 'react'
 import { Link, Navigate } from 'react-router-dom'
 import { api } from '../api/client'
 import type { Monitor } from '../api/types'
 import { HeartbeatBar } from '../components/HeartbeatBar'
 import { StatusPill } from '../components/StatusPill'
 import { useAuth } from '../hooks/useAuth'
+import { withinWindow } from '../lib/ranges'
 
 export function MonitorsList() {
   const { user, loading } = useAuth()
   const [monitors, setMonitors] = useState<Monitor[]>([])
   const [error, setError] = useState('')
+  const [favBusy, setFavBusy] = useState<string | null>(null)
 
   useEffect(() => {
     if (!user) return
@@ -25,13 +27,31 @@ export function MonitorsList() {
   if (loading) return <p className="meta">Loading…</p>
   if (!user) return <Navigate to="/login" replace />
 
+  async function toggleFavorite(m: Monitor, e: MouseEvent) {
+    e.preventDefault()
+    e.stopPropagation()
+    if (favBusy) return
+    setFavBusy(m.id)
+    try {
+      const updated = await api<Monitor>(`/api/monitors/${m.id}/favorite/`, {
+        method: 'POST',
+        body: JSON.stringify({ is_favorite: !m.is_favorite }),
+      })
+      setMonitors((prev) => prev.map((x) => (x.id === updated.id ? { ...x, ...updated } : x)))
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Favorite failed')
+    } finally {
+      setFavBusy(null)
+    }
+  }
+
   return (
     <section className="page">
       <div className="row-between">
         <div>
           <p className="eyebrow">Targets</p>
           <h1>Monitors</h1>
-          <p className="lede">Everything THRUM is listening to.</p>
+          <p className="lede">Everything THRUM is listening to · bars show 1h.</p>
         </div>
         <Link className="btn" to="/monitors/new">
           New monitor
@@ -54,13 +74,25 @@ export function MonitorsList() {
                   <h3>{m.name}</h3>
                   <p className="muted truncate">{m.target || 'Heartbeat only'}</p>
                 </div>
-                <StatusPill status={m.status} />
+                <div className="card-actions">
+                  <button
+                    type="button"
+                    className={`star-btn${m.is_favorite ? ' on' : ''}`}
+                    aria-label={m.is_favorite ? 'Unfavorite' : 'Favorite'}
+                    disabled={favBusy === m.id}
+                    onClick={(e) => void toggleFavorite(m, e)}
+                  >
+                    ★
+                  </button>
+                  <StatusPill status={m.status} />
+                </div>
               </div>
               <HeartbeatBar
                 status={m.status}
-                results={m.recent_results}
+                results={withinWindow(m.recent_results, 60 * 60 * 1000)}
                 interactive={false}
-                segments={36}
+                segments={48}
+                ageFade
               />
               <div className="monitor-card-foot">
                 <span className="type-chip">{m.type}</span>

@@ -8,6 +8,7 @@ import { Landing } from './pages/Landing'
 import { Login } from './pages/Login'
 import { MonitorDetail } from './pages/MonitorDetail'
 import { MonitorForm } from './pages/MonitorForm'
+import { MonitorHistory } from './pages/MonitorHistory'
 import { MonitorsList } from './pages/MonitorsList'
 import { Register } from './pages/Register'
 import './App.css'
@@ -25,6 +26,7 @@ export default function App() {
               <Route path="dashboard" element={<Dashboard />} />
               <Route path="monitors" element={<MonitorsList />} />
               <Route path="monitors/new" element={<MonitorForm />} />
+              <Route path="monitors/:id/history" element={<MonitorHistory />} />
               <Route path="monitors/:id" element={<MonitorDetail />} />
               <Route path="monitors/:id/edit" element={<MonitorForm />} />
               <Route path="alerts" element={<AlertChannels />} />

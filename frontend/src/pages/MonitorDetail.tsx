@@ -5,6 +5,7 @@ import type { CheckResult, Monitor } from '../api/types'
 import { HeartbeatBar } from '../components/HeartbeatBar'
 import { StatusPill } from '../components/StatusPill'
 import { useAuth } from '../hooks/useAuth'
+import { DETAIL_RANGES, type BarRange } from '../lib/ranges'
 
 function fmtTime(iso: string | null) {
   if (!iso) return '—'
@@ -22,6 +23,8 @@ export function MonitorDetail() {
   const location = useLocation()
   const [monitor, setMonitor] = useState<Monitor | null>(null)
   const [results, setResults] = useState<CheckResult[]>([])
+  const [recentList, setRecentList] = useState<CheckResult[]>([])
+  const [range, setRange] = useState<BarRange>('30d')
   const [error, setError] = useState('')
   const [checking, setChecking] = useState(false)
   const [revealedKey, setRevealedKey] = useState<string | null>(
@@ -29,16 +32,25 @@ export function MonitorDetail() {
   )
   const [rotating, setRotating] = useState(false)
   const [picked, setPicked] = useState<CheckResult | null>(null)
+  const [showNotes, setShowNotes] = useState(false)
+  const [favBusy, setFavBusy] = useState(false)
 
   const load = useCallback(async () => {
     if (!user || !id) return
-    const [m, r] = await Promise.all([
+    const useBuckets = range === '7d' || range === '30d'
+    const [m, bar, list] = await Promise.all([
       api<Monitor>(`/api/monitors/${id}/`),
-      api<CheckResult[]>(`/api/monitors/${id}/results/?limit=56`),
+      api<CheckResult[]>(
+        useBuckets
+          ? `/api/monitors/${id}/results/?range=${range}&buckets=72`
+          : `/api/monitors/${id}/results/?range=${range}&limit=120`,
+      ),
+      api<CheckResult[]>(`/api/monitors/${id}/results/?range=1d&limit=15`),
     ])
     setMonitor(m)
-    setResults(r)
-  }, [user, id])
+    setResults(bar)
+    setRecentList(list)
+  }, [user, id, range])
 
   useEffect(() => {
     if (!user || !id) return
@@ -91,14 +103,33 @@ export function MonitorDetail() {
     }
   }
 
+  async function onToggleFavorite() {
+    if (!monitor || favBusy) return
+    setFavBusy(true)
+    try {
+      const updated = await api<Monitor>(`/api/monitors/${monitor.id}/favorite/`, {
+        method: 'POST',
+        body: JSON.stringify({ is_favorite: !monitor.is_favorite }),
+      })
+      setMonitor(updated)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Favorite failed')
+    } finally {
+      setFavBusy(false)
+    }
+  }
+
   if (error && !monitor) return <p className="error">{error}</p>
   if (!monitor) return <p className="meta">Loading…</p>
 
   const canCheck = monitor.type === 'http' || monitor.type === 'tcp'
   const isHeartbeat = monitor.type === 'heartbeat'
-  const latest = results[0]
-  // One-line curl works in Windows CMD and Unix shells (no bash \\ continuations).
-  const curl = `curl -X POST "${window.location.origin}/api/v1/heartbeat/${monitor.id}/" -H "Authorization: Bearer ${revealedKey || 'YOUR_API_KEY'}" -H "Content-Type: application/json" -d "{\\"status\\":\\"ok\\"}"`
+  const latest = recentList[0] ?? results[0]
+  const hbUrl = `${window.location.origin}/api/v1/heartbeat/${monitor.id}/`
+  const hbKey = revealedKey || 'YOUR_API_KEY'
+  const curlPs = `curl.exe -sS -X POST "${hbUrl}" -H "Authorization: Bearer ${hbKey}"`
+  const sleepSec = Math.max(15, Math.floor(monitor.interval_seconds / 2))
+  const ageFade = range === '7d' || range === '30d'
 
   return (
     <section className="page">
@@ -112,6 +143,15 @@ export function MonitorDetail() {
           <p className="lede truncate">{monitor.target || 'Heartbeat-only monitor'}</p>
         </div>
         <div className="actions">
+          <button
+            type="button"
+            className={`star-btn lg${monitor.is_favorite ? ' on' : ''}`}
+            aria-label={monitor.is_favorite ? 'Unfavorite' : 'Favorite'}
+            disabled={favBusy}
+            onClick={() => void onToggleFavorite()}
+          >
+            ★
+          </button>
           <StatusPill status={monitor.status} />
           {canCheck ? (
             <button
@@ -167,30 +207,49 @@ export function MonitorDetail() {
           <h3 className="curl-heading">Send a heartbeat</h3>
           <p className="meta">
             Window: every <strong>{monitor.interval_seconds + monitor.heartbeat_grace_seconds}s</strong>{' '}
-            (interval {monitor.interval_seconds}s + grace {monitor.heartbeat_grace_seconds}s). One curl =
-            one beat. Orange = first miss; red = second miss (alert). PowerShell loop:
+            (interval {monitor.interval_seconds}s + grace {monitor.heartbeat_grace_seconds}s). One POST =
+            one beat. No JSON body needed.
           </p>
-          <pre className="curl-block">{`while ($true) { ${curl}; Start-Sleep -Seconds ${Math.max(15, Math.floor(monitor.interval_seconds / 2))} }`}</pre>
-          <p className="meta">Single shot (CMD):</p>
-          <pre className="curl-block">{curl}</pre>
+          <p className="meta">PowerShell loop (use curl.exe, not curl):</p>
+          <pre className="curl-block">{`while ($true) { ${curlPs}; Start-Sleep -Seconds ${sleepSec} }`}</pre>
+          <p className="meta">Single shot:</p>
+          <pre className="curl-block">{curlPs}</pre>
         </div>
       ) : null}
 
       <div className="detail-panel">
-        <h2>Availability</h2>
+        <div className="row-between" style={{ marginBottom: '0.65rem' }}>
+          <h2 style={{ margin: 0 }}>Availability</h2>
+          <div className="range-tabs" role="tablist" aria-label="Bar range">
+            {DETAIL_RANGES.map((r) => (
+              <button
+                key={r.id}
+                type="button"
+                role="tab"
+                aria-selected={range === r.id}
+                className={`range-tab${range === r.id ? ' on' : ''}`}
+                onClick={() => {
+                  setRange(r.id)
+                  setPicked(null)
+                }}
+              >
+                {r.label}
+              </button>
+            ))}
+          </div>
+        </div>
         <p className="meta" style={{ marginBottom: '0.65rem' }}>
           Last check {fmtTime(monitor.last_checked_at)}
           {latest?.latency_ms != null ? ` · ${latest.latency_ms} ms` : ''}
           {monitor.consecutive_failures > 0
             ? ` · ${monitor.consecutive_failures} consecutive fail${monitor.consecutive_failures === 1 ? '' : 's'}`
             : ''}
-          {' · '}
-          green OK · orange first fail · red confirmed down
         </p>
         <HeartbeatBar
           status={monitor.status}
-          segments={56}
+          segments={72}
           results={results}
+          ageFade={ageFade}
           onSelect={setPicked}
         />
         {picked ? (
@@ -199,7 +258,7 @@ export function MonitorDetail() {
             {picked.success ? ' · OK' : ' · fail'}
             {picked.latency_ms != null ? ` · ${picked.latency_ms} ms` : ''}
             {picked.status_code != null ? ` · HTTP ${picked.status_code}` : ''}
-            {picked.error_message ? ` · ${picked.error_message}` : ''}
+            {showNotes && picked.error_message ? ` · ${picked.error_message}` : ''}
           </p>
         ) : results.length === 0 ? (
           <p className="meta">
@@ -210,6 +269,9 @@ export function MonitorDetail() {
                 : 'No data yet.'}
           </p>
         ) : null}
+        <button type="button" className="text-toggle" onClick={() => setShowNotes((v) => !v)}>
+          {showNotes ? 'Hide notes' : 'Notes'}
+        </button>
       </div>
 
       <dl className="detail-grid">
@@ -243,11 +305,17 @@ export function MonitorDetail() {
         </dd>
       </dl>
 
-      {results.length > 0 ? (
-        <div className="detail-panel" style={{ marginTop: '1.25rem' }}>
-          <h2>Recent checks</h2>
+      <div className="detail-panel" style={{ marginTop: '1.25rem' }}>
+        <div className="row-between">
+          <h2 style={{ margin: 0 }}>Recent checks</h2>
+          <Link className="text-toggle" to={`/monitors/${monitor.id}/history?range=1d`}>
+            Full history →
+          </Link>
+        </div>
+        <p className="meta">Last day · 15 newest</p>
+        {recentList.length > 0 ? (
           <ul className="check-list">
-            {results.slice(0, 12).map((r) => (
+            {recentList.map((r) => (
               <li key={r.id}>
                 <span className={r.success ? 'ok' : 'bad'}>{r.success ? 'UP' : 'DOWN'}</span>
                 <span className="muted">{fmtTime(r.checked_at)}</span>
@@ -255,14 +323,16 @@ export function MonitorDetail() {
                   {r.latency_ms != null ? `${r.latency_ms}ms` : '—'}
                   {r.status_code != null ? ` · HTTP ${r.status_code}` : ''}
                 </span>
-                {!r.success && r.error_message ? (
+                {showNotes && !r.success && r.error_message ? (
                   <span className="err-msg">{r.error_message}</span>
                 ) : null}
               </li>
             ))}
           </ul>
-        </div>
-      ) : null}
+        ) : (
+          <p className="meta">No checks in the last day.</p>
+        )}
+      </div>
     </section>
   )
 }

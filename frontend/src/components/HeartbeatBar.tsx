@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, type CSSProperties } from 'react'
 import type { CheckResult, MonitorStatus } from '../api/types'
 
 type Tone = 'up' | 'warn' | 'down' | 'unknown'
@@ -6,6 +6,8 @@ type Tone = 'up' | 'warn' | 'down' | 'unknown'
 type Seg = {
   tone: Tone
   result?: CheckResult
+  /** 0 = newest, 1 = oldest — used for age fade on long ranges. */
+  age?: number
 }
 
 type Props = {
@@ -15,6 +17,8 @@ type Props = {
   results?: CheckResult[]
   /** Buttons + hover panel (detail page). Off inside card links. */
   interactive?: boolean
+  /** Fade older segments toward muted (long-range bars). */
+  ageFade?: boolean
   onSelect?: (result: CheckResult | null) => void
 }
 
@@ -25,13 +29,16 @@ function classify(results: CheckResult[] | undefined, segments: number): Seg[] {
   const chronological = [...results].reverse().slice(-segments)
   const segs: Seg[] = []
   let streak = 0
-  for (const r of chronological) {
+  const n = chronological.length
+  for (let i = 0; i < chronological.length; i++) {
+    const r = chronological[i]
+    const age = n <= 1 ? 0 : 1 - i / (n - 1)
     if (r.success) {
       streak = 0
-      segs.push({ tone: 'up', result: r })
+      segs.push({ tone: 'up', result: r, age })
     } else {
       streak += 1
-      segs.push({ tone: streak < 2 ? 'warn' : 'down', result: r })
+      segs.push({ tone: streak < 2 ? 'warn' : 'down', result: r, age })
     }
   }
   while (segs.length < segments) segs.unshift({ tone: 'unknown' })
@@ -55,12 +62,20 @@ function tip(seg: Seg): string {
   return parts.join(' · ')
 }
 
+function ageStyle(age: number | undefined, fade: boolean): CSSProperties | undefined {
+  if (!fade || age == null) return undefined
+  // Newer stays vivid; older drifts toward muted (green → yellow → orange feel via opacity).
+  const opacity = 0.35 + (1 - age) * 0.65
+  return { opacity }
+}
+
 /** Uptime bar: green = ok, orange = first fail, red = confirmed fail (2+). */
 export function HeartbeatBar({
   status: _status,
   segments = 40,
   results,
   interactive = true,
+  ageFade = false,
   onSelect,
 }: Props) {
   const segs = classify(results, segments)
@@ -75,6 +90,7 @@ export function HeartbeatBar({
               key={i}
               type="button"
               className={`hb-seg hb-${seg.tone}${seg.result ? ' clickable' : ''}`}
+              style={ageStyle(seg.age, ageFade)}
               title={tip(seg)}
               aria-label={tip(seg)}
               onMouseEnter={() => setHover(tip(seg))}
@@ -88,7 +104,12 @@ export function HeartbeatBar({
               }}
             />
           ) : (
-            <span key={i} className={`hb-seg hb-${seg.tone}`} title={tip(seg)} />
+            <span
+              key={i}
+              className={`hb-seg hb-${seg.tone}`}
+              style={ageStyle(seg.age, ageFade)}
+              title={tip(seg)}
+            />
           ),
         )}
       </div>
