@@ -1,85 +1,94 @@
 import { useState, type CSSProperties } from 'react'
-import type { CheckResult, MonitorStatus } from '../api/types'
+import type { BarSegment, MonitorStatus } from '../api/types'
 
-type Tone = 'up' | 'warn' | 'down' | 'unknown'
+type Tone = 'up' | 'warn' | 'down' | 'empty' | 'unknown'
 
 type Seg = {
   tone: Tone
-  result?: CheckResult
-  /** 0 = newest, 1 = oldest — used for age fade on long ranges. */
+  segment?: BarSegment
   age?: number
 }
 
 type Props = {
   status: MonitorStatus
-  segments?: number
-  /** Newest-first results. When missing/empty → gray (no fake history). */
-  results?: CheckResult[]
-  /** Buttons + hover panel (detail page). Off inside card links. */
+  /** Newest-first time-aligned segments (or raw checks). No left-padding. */
+  results?: BarSegment[]
   interactive?: boolean
-  /** Fade older segments toward muted (long-range bars). */
   ageFade?: boolean
-  onSelect?: (result: CheckResult | null) => void
+  onSelect?: (segment: BarSegment | null) => void
 }
 
-function classify(results: CheckResult[] | undefined, segments: number): Seg[] {
-  if (!results || results.length === 0) {
-    return Array.from({ length: segments }, () => ({ tone: 'unknown' as const }))
-  }
-  const chronological = [...results].reverse().slice(-segments)
+function toneOf(r: BarSegment, streak: number): Tone {
+  if (r.tone === 'empty' || r.success === null) return 'empty'
+  if (r.tone === 'up' || r.tone === 'warn' || r.tone === 'down') return r.tone
+  if (r.success) return 'up'
+  return streak < 2 ? 'warn' : 'down'
+}
+
+function classify(results: BarSegment[] | undefined): Seg[] {
+  if (!results || results.length === 0) return []
+  // Results are newest-first; paint oldest → newest left → right.
+  const chronological = [...results].reverse()
   const segs: Seg[] = []
   let streak = 0
   const n = chronological.length
   for (let i = 0; i < chronological.length; i++) {
     const r = chronological[i]
     const age = n <= 1 ? 0 : 1 - i / (n - 1)
-    if (r.success) {
-      streak = 0
-      segs.push({ tone: 'up', result: r, age })
-    } else {
-      streak += 1
-      segs.push({ tone: streak < 2 ? 'warn' : 'down', result: r, age })
-    }
+    if (r.success === true) streak = 0
+    else if (r.success === false) streak += 1
+    segs.push({ tone: toneOf(r, streak), segment: r, age })
   }
-  while (segs.length < segments) segs.unshift({ tone: 'unknown' })
   return segs
 }
 
 function tip(seg: Seg): string {
-  if (!seg.result) return 'No check yet'
-  const when = new Date(seg.result.checked_at).toLocaleString()
+  const r = seg.segment
+  if (!r || seg.tone === 'empty') {
+    if (r?.bucket_start) {
+      return `${new Date(r.bucket_start).toLocaleString()} · no data`
+    }
+    return 'No data'
+  }
+  const when = new Date(r.checked_at).toLocaleString()
   const parts = [when]
-  if (seg.result.success) {
+  if (r.success) {
     parts.push('OK')
-    if (seg.result.latency_ms != null) parts.push(`${seg.result.latency_ms} ms`)
-    if (seg.result.status_code != null) parts.push(`HTTP ${seg.result.status_code}`)
+    if (r.latency_ms != null) parts.push(`${r.latency_ms} ms`)
+    if (r.status_code != null) parts.push(`HTTP ${r.status_code}`)
   } else {
     parts.push(seg.tone === 'warn' ? 'Soft fail' : 'Down')
-    if (seg.result.latency_ms != null) parts.push(`${seg.result.latency_ms} ms`)
-    if (seg.result.status_code != null) parts.push(`HTTP ${seg.result.status_code}`)
-    if (seg.result.error_message) parts.push(seg.result.error_message)
+    if (r.latency_ms != null) parts.push(`${r.latency_ms} ms`)
+    if (r.status_code != null) parts.push(`HTTP ${r.status_code}`)
+    if (r.error_message) parts.push(r.error_message)
   }
   return parts.join(' · ')
 }
 
 function ageStyle(age: number | undefined, fade: boolean): CSSProperties | undefined {
   if (!fade || age == null) return undefined
-  // Newer stays vivid; older drifts toward muted (green → yellow → orange feel via opacity).
-  const opacity = 0.35 + (1 - age) * 0.65
-  return { opacity }
+  return { opacity: 0.4 + (1 - age) * 0.6 }
 }
 
-/** Uptime bar: green = ok, orange = first fail, red = confirmed fail (2+). */
+/** Uptime bar — only real time slots; never pads with fake “not checked” blocks. */
 export function HeartbeatBar({
   status: _status,
-  segments = 40,
   results,
   interactive = true,
   ageFade = false,
   onSelect,
 }: Props) {
-  const segs = classify(results, segments)
+  const segs = classify(results)
   const [hover, setHover] = useState<string | null>(null)
+
+  if (segs.length === 0) {
+    return (
+      <div className="hb-wrap">
+        <div className="hb-bar hb-bar-empty" role="img" aria-label="No availability data yet" />
+        {interactive ? <p className="hb-tip meta">&nbsp;</p> : null}
+      </div>
+    )
+  }
 
   return (
     <div className="hb-wrap">
@@ -89,7 +98,7 @@ export function HeartbeatBar({
             <button
               key={i}
               type="button"
-              className={`hb-seg hb-${seg.tone}${seg.result ? ' clickable' : ''}`}
+              className={`hb-seg hb-${seg.tone}${seg.tone !== 'empty' ? ' clickable' : ''}`}
               style={ageStyle(seg.age, ageFade)}
               title={tip(seg)}
               aria-label={tip(seg)}
@@ -100,7 +109,7 @@ export function HeartbeatBar({
               onClick={(e) => {
                 e.preventDefault()
                 e.stopPropagation()
-                onSelect?.(seg.result ?? null)
+                onSelect?.(seg.segment ?? null)
               }}
             />
           ) : (
@@ -113,7 +122,8 @@ export function HeartbeatBar({
           ),
         )}
       </div>
-      {interactive && hover ? <p className="hb-tip meta">{hover}</p> : null}
+      {/* Always reserve tip height — avoids layout jump on hover. */}
+      {interactive ? <p className="hb-tip meta">{hover || '\u00a0'}</p> : null}
     </div>
   )
 }

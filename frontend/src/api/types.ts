@@ -16,6 +16,27 @@ export type CheckResult = {
   status_code: number | null
 }
 
+/** Time-aligned bar slot (from /results/?range=…). success null = empty gap. */
+export type BarSegment = {
+  id: number
+  checked_at: string
+  success: boolean | null
+  latency_ms: number | null
+  error_message: string
+  status_code: number | null
+  tone?: 'up' | 'warn' | 'down' | 'empty'
+  bucket_start?: string
+  bucket_end?: string
+}
+
+export type UptimeSummary = {
+  '10m': number | null
+  '1h': number | null
+  '1d': number | null
+  '7d': number | null
+  '30d': number | null
+}
+
 export type Monitor = {
   id: string
   name: string
@@ -32,6 +53,8 @@ export type Monitor = {
   is_enabled: boolean
   is_favorite: boolean
   favorited_at: string | null
+  is_public: boolean
+  public_slug: string | null
   created_at: string
   updated_at: string
   api_key_prefix: string

@@ -45,6 +45,9 @@ class Monitor(models.Model):
     is_enabled = models.BooleanField(default=True)
     is_favorite = models.BooleanField(default=False)
     favorited_at = models.DateTimeField(null=True, blank=True)
+    is_public = models.BooleanField(default=False)
+    # Null until share is enabled — unique allows many NULLs.
+    public_slug = models.CharField(max_length=32, blank=True, null=True, unique=True, default=None)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -56,6 +59,7 @@ class Monitor(models.Model):
             models.Index(fields=["last_checked_at"]),
             models.Index(fields=["type"]),
             models.Index(fields=["owner", "is_favorite"]),
+            models.Index(fields=["is_public", "public_slug"]),
         ]
 
     def __str__(self) -> str:

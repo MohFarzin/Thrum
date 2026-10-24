@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link, Navigate, useParams, useSearchParams } from 'react-router-dom'
 import { api } from '../api/client'
-import type { CheckResult, Monitor } from '../api/types'
+import type { BarSegment, CheckResult, Monitor } from '../api/types'
 import { HeartbeatBar } from '../components/HeartbeatBar'
 import { StatusPill } from '../components/StatusPill'
 import { useAuth } from '../hooks/useAuth'
@@ -25,7 +25,7 @@ export function MonitorHistory() {
     : '1d') as BarRange
 
   const [monitor, setMonitor] = useState<Monitor | null>(null)
-  const [results, setResults] = useState<CheckResult[]>([])
+  const [results, setResults] = useState<BarSegment[]>([])
   const [list, setList] = useState<CheckResult[]>([])
   const [error, setError] = useState('')
   const [showNotes, setShowNotes] = useState(false)
@@ -34,7 +34,7 @@ export function MonitorHistory() {
     if (!user || !id) return
     const [m, buckets, recent] = await Promise.all([
       api<Monitor>(`/api/monitors/${id}/`),
-      api<CheckResult[]>(`/api/monitors/${id}/results/?range=${range}&buckets=72`),
+      api<BarSegment[]>(`/api/monitors/${id}/results/?range=${range}&bar=1`),
       api<CheckResult[]>(`/api/monitors/${id}/results/?range=${range}&limit=200`),
     ])
     setMonitor(m)
@@ -84,7 +84,6 @@ export function MonitorHistory() {
       <div className="detail-panel">
         <HeartbeatBar
           status={monitor.status}
-          segments={72}
           results={results}
           ageFade={range === '7d' || range === '30d' || range === '60d'}
         />

@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link, Navigate, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { api } from '../api/client'
-import type { CheckResult, Monitor } from '../api/types'
+import type { BarSegment, CheckResult, Monitor, UptimeSummary } from '../api/types'
 import { HeartbeatBar } from '../components/HeartbeatBar'
+import { HeartbeatCommands } from '../components/HeartbeatCommands'
 import { StatusPill } from '../components/StatusPill'
 import { useAuth } from '../hooks/useAuth'
 import { DETAIL_RANGES, type BarRange } from '../lib/ranges'
@@ -16,14 +17,20 @@ function fmtTime(iso: string | null) {
   }
 }
 
+function fmtPct(v: number | null | undefined) {
+  if (v == null) return '—'
+  return `${v}%`
+}
+
 export function MonitorDetail() {
   const { user, loading } = useAuth()
   const { id } = useParams()
   const navigate = useNavigate()
   const location = useLocation()
   const [monitor, setMonitor] = useState<Monitor | null>(null)
-  const [results, setResults] = useState<CheckResult[]>([])
+  const [results, setResults] = useState<BarSegment[]>([])
   const [recentList, setRecentList] = useState<CheckResult[]>([])
+  const [uptime, setUptime] = useState<UptimeSummary | null>(null)
   const [range, setRange] = useState<BarRange>('30d')
   const [error, setError] = useState('')
   const [checking, setChecking] = useState(false)
@@ -31,25 +38,23 @@ export function MonitorDetail() {
     () => (location.state as { apiKey?: string } | null)?.apiKey ?? null,
   )
   const [rotating, setRotating] = useState(false)
-  const [picked, setPicked] = useState<CheckResult | null>(null)
+  const [picked, setPicked] = useState<BarSegment | null>(null)
   const [showNotes, setShowNotes] = useState(false)
   const [favBusy, setFavBusy] = useState(false)
+  const [shareBusy, setShareBusy] = useState(false)
 
   const load = useCallback(async () => {
     if (!user || !id) return
-    const useBuckets = range === '7d' || range === '30d'
-    const [m, bar, list] = await Promise.all([
+    const [m, bar, list, up] = await Promise.all([
       api<Monitor>(`/api/monitors/${id}/`),
-      api<CheckResult[]>(
-        useBuckets
-          ? `/api/monitors/${id}/results/?range=${range}&buckets=72`
-          : `/api/monitors/${id}/results/?range=${range}&limit=120`,
-      ),
+      api<BarSegment[]>(`/api/monitors/${id}/results/?range=${range}&bar=1`),
       api<CheckResult[]>(`/api/monitors/${id}/results/?range=1d&limit=15`),
+      api<UptimeSummary>(`/api/monitors/${id}/uptime/`),
     ])
     setMonitor(m)
     setResults(bar)
     setRecentList(list)
+    setUptime(up)
   }, [user, id, range])
 
   useEffect(() => {
@@ -119,17 +124,36 @@ export function MonitorDetail() {
     }
   }
 
+  async function onToggleShare() {
+    if (!monitor || shareBusy) return
+    setShareBusy(true)
+    try {
+      const updated = await api<Monitor>(`/api/monitors/${monitor.id}/share/`, {
+        method: 'POST',
+        body: JSON.stringify({ is_public: !monitor.is_public }),
+      })
+      setMonitor(updated)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Share update failed')
+    } finally {
+      setShareBusy(false)
+    }
+  }
+
   if (error && !monitor) return <p className="error">{error}</p>
   if (!monitor) return <p className="meta">Loading…</p>
 
   const canCheck = monitor.type === 'http' || monitor.type === 'tcp'
   const isHeartbeat = monitor.type === 'heartbeat'
-  const latest = recentList[0] ?? results[0]
+  const latest = recentList[0]
   const hbUrl = `${window.location.origin}/api/v1/heartbeat/${monitor.id}/`
   const hbKey = revealedKey || 'YOUR_API_KEY'
-  const curlPs = `curl.exe -sS -X POST "${hbUrl}" -H "Authorization: Bearer ${hbKey}"`
   const sleepSec = Math.max(15, Math.floor(monitor.interval_seconds / 2))
   const ageFade = range === '7d' || range === '30d'
+  const shareUrl =
+    monitor.is_public && monitor.public_slug
+      ? `${window.location.origin}/s/${monitor.public_slug}`
+      : null
 
   return (
     <section className="page">
@@ -204,16 +228,12 @@ export function MonitorDetail() {
               {rotating ? 'Rotating…' : 'Rotate key'}
             </button>
           </div>
-          <h3 className="curl-heading">Send a heartbeat</h3>
-          <p className="meta">
-            Window: every <strong>{monitor.interval_seconds + monitor.heartbeat_grace_seconds}s</strong>{' '}
-            (interval {monitor.interval_seconds}s + grace {monitor.heartbeat_grace_seconds}s). One POST =
-            one beat. No JSON body needed.
+          <p className="meta" style={{ marginTop: '1rem' }}>
+            Window: every{' '}
+            <strong>{monitor.interval_seconds + monitor.heartbeat_grace_seconds}s</strong> (interval{' '}
+            {monitor.interval_seconds}s + grace {monitor.heartbeat_grace_seconds}s).
           </p>
-          <p className="meta">PowerShell loop (use curl.exe, not curl):</p>
-          <pre className="curl-block">{`while ($true) { ${curlPs}; Start-Sleep -Seconds ${sleepSec} }`}</pre>
-          <p className="meta">Single shot:</p>
-          <pre className="curl-block">{curlPs}</pre>
+          <HeartbeatCommands url={hbUrl} apiKey={hbKey} sleepSec={sleepSec} />
         </div>
       ) : null}
 
@@ -238,6 +258,23 @@ export function MonitorDetail() {
             ))}
           </div>
         </div>
+        <div className="uptime-row" aria-label="Uptime">
+          <span>
+            <em>10m</em> {fmtPct(uptime?.['10m'])}
+          </span>
+          <span>
+            <em>1h</em> {fmtPct(uptime?.['1h'])}
+          </span>
+          <span>
+            <em>1d</em> {fmtPct(uptime?.['1d'])}
+          </span>
+          <span>
+            <em>1w</em> {fmtPct(uptime?.['7d'])}
+          </span>
+          <span>
+            <em>30d</em> {fmtPct(uptime?.['30d'])}
+          </span>
+        </div>
         <p className="meta" style={{ marginBottom: '0.65rem' }}>
           Last check {fmtTime(monitor.last_checked_at)}
           {latest?.latency_ms != null ? ` · ${latest.latency_ms} ms` : ''}
@@ -247,31 +284,58 @@ export function MonitorDetail() {
         </p>
         <HeartbeatBar
           status={monitor.status}
-          segments={72}
           results={results}
           ageFade={ageFade}
           onSelect={setPicked}
         />
-        {picked ? (
-          <p className="meta">
-            Selected: {fmtTime(picked.checked_at)}
-            {picked.success ? ' · OK' : ' · fail'}
-            {picked.latency_ms != null ? ` · ${picked.latency_ms} ms` : ''}
-            {picked.status_code != null ? ` · HTTP ${picked.status_code}` : ''}
-            {showNotes && picked.error_message ? ` · ${picked.error_message}` : ''}
-          </p>
-        ) : results.length === 0 ? (
-          <p className="meta">
-            {canCheck
-              ? 'No checks yet — wait for the scheduler or hit Check now.'
-              : isHeartbeat
-                ? 'Waiting for the first agent heartbeat.'
-                : 'No data yet.'}
-          </p>
-        ) : null}
+        <p className="meta picked-slot">
+          {picked
+            ? `Selected: ${fmtTime(picked.checked_at)}${picked.success === true ? ' · OK' : picked.success === false ? ' · fail' : ' · gap'}${picked.latency_ms != null ? ` · ${picked.latency_ms} ms` : ''}${picked.status_code != null ? ` · HTTP ${picked.status_code}` : ''}${showNotes && picked.error_message ? ` · ${picked.error_message}` : ''}`
+            : results.length === 0
+              ? canCheck
+                ? 'No checks yet — wait for the scheduler or hit Check now.'
+                : isHeartbeat
+                  ? 'Waiting for the first agent heartbeat.'
+                  : 'No data yet.'
+              : '\u00a0'}
+        </p>
         <button type="button" className="text-toggle" onClick={() => setShowNotes((v) => !v)}>
           {showNotes ? 'Hide notes' : 'Notes'}
         </button>
+      </div>
+
+      <div className="detail-panel">
+        <div className="row-between">
+          <h2 style={{ margin: 0 }}>Public status</h2>
+          <button
+            type="button"
+            className="btn tiny ghost"
+            disabled={shareBusy}
+            onClick={() => void onToggleShare()}
+          >
+            {monitor.is_public ? 'Turn off sharing' : 'Share status'}
+          </button>
+        </div>
+        <p className="meta">
+          Anyone with the link can see status and uptime — no login. Keys stay private.
+        </p>
+        {shareUrl ? (
+          <div className="share-line">
+            <code className="key-reveal">{shareUrl}</code>
+            <button
+              type="button"
+              className="btn tiny ghost"
+              onClick={() => void navigator.clipboard.writeText(shareUrl)}
+            >
+              Copy link
+            </button>
+            <a className="text-toggle" href={shareUrl} target="_blank" rel="noreferrer">
+              Open
+            </a>
+          </div>
+        ) : (
+          <p className="meta">Sharing is off.</p>
+        )}
       </div>
 
       <dl className="detail-grid">

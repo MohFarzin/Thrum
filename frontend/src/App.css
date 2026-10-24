@@ -522,10 +522,60 @@ label.check {
   background: color-mix(in srgb, var(--muted) 55%, var(--line));
 }
 
-.hb-tip {
-  margin: 0;
-  min-height: 1.2em;
+.hb-tip,
+.picked-slot {
+  margin: 0.35rem 0 0;
+  min-height: 1.35em;
   font-size: 0.82rem;
+}
+
+.hb-bar-empty {
+  height: 28px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--muted) 18%, var(--line));
+}
+
+.hb-empty {
+  background: color-mix(in srgb, var(--muted) 22%, transparent);
+  opacity: 0.45;
+}
+
+.uptime-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem 1.1rem;
+  margin: 0 0 0.75rem;
+  font-size: 0.88rem;
+  color: var(--text-h);
+}
+
+.uptime-row em {
+  font-style: normal;
+  color: var(--muted);
+  font-size: 0.75rem;
+  margin-right: 0.3rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.cmd-drawer {
+  margin-top: 0.85rem;
+}
+
+.cmd-panel {
+  margin-top: 0.75rem;
+  display: grid;
+  gap: 0.55rem;
+}
+
+.share-line {
+  display: grid;
+  gap: 0.55rem;
+  align-items: start;
+}
+
+.share-line .key-reveal {
+  margin-bottom: 0;
 }
 
 .brand-link img {

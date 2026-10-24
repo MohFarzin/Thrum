@@ -10,6 +10,7 @@ import { MonitorDetail } from './pages/MonitorDetail'
 import { MonitorForm } from './pages/MonitorForm'
 import { MonitorHistory } from './pages/MonitorHistory'
 import { MonitorsList } from './pages/MonitorsList'
+import { PublicStatus } from './pages/PublicStatus'
 import { Register } from './pages/Register'
 import './App.css'
 
@@ -30,6 +31,7 @@ export default function App() {
               <Route path="monitors/:id" element={<MonitorDetail />} />
               <Route path="monitors/:id/edit" element={<MonitorForm />} />
               <Route path="alerts" element={<AlertChannels />} />
+              <Route path="s/:slug" element={<PublicStatus />} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Route>
           </Routes>

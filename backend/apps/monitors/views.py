@@ -1,65 +1,17 @@
-from datetime import timedelta
-
 from django.db.models import Prefetch
 from django.utils import timezone
 from rest_framework import status, viewsets
-from rest_framework.decorators import action
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.decorators import action, api_view, permission_classes
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 
+from .bar import DEFAULT_BUCKETS, RANGE_DELTAS, time_buckets, uptime_summary
 from .keys import assign_new_key
 from .models import CheckResult, Monitor
 from .serializers import CheckResultSerializer, MonitorSerializer
 from .services import run_monitor_check
 
 MAX_FAVORITES = 6
-
-RANGE_DELTAS = {
-    "10m": timedelta(minutes=10),
-    "1h": timedelta(hours=1),
-    "1d": timedelta(days=1),
-    "7d": timedelta(days=7),
-    "30d": timedelta(days=30),
-    "60d": timedelta(days=60),
-}
-
-
-def _bucket_results(rows: list[CheckResult], buckets: int) -> list[dict]:
-    """Collapse newest-first rows into chronological buckets for long-range bars."""
-    if not rows or buckets < 1:
-        return []
-    chronological = list(reversed(rows))
-    n = len(chronological)
-    out: list[dict] = []
-    for i in range(buckets):
-        start = (i * n) // buckets
-        end = ((i + 1) * n) // buckets
-        chunk = chronological[start:end]
-        if not chunk:
-            continue
-        fails = sum(1 for r in chunk if not r.success)
-        last = chunk[-1]
-        if fails == 0:
-            success = True
-            err = ""
-        elif fails == 1 and len(chunk) > 1:
-            success = False
-            err = "soft fail"
-        else:
-            success = False
-            err = f"{fails}/{len(chunk)} failed"
-        latencies = [r.latency_ms for r in chunk if r.latency_ms is not None]
-        out.append(
-            {
-                "id": last.id,
-                "checked_at": last.checked_at.isoformat().replace("+00:00", "Z"),
-                "success": success,
-                "latency_ms": int(sum(latencies) / len(latencies)) if latencies else None,
-                "error_message": err,
-                "status_code": last.status_code,
-            }
-        )
-    return list(reversed(out))  # newest-first
 
 
 class MonitorViewSet(viewsets.ModelViewSet):
@@ -104,31 +56,55 @@ class MonitorViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=["get"], url_path="results")
     def results(self, request, id=None):
         monitor = self.get_object()
-        qs = CheckResult.objects.filter(monitor=monitor).order_by("-checked_at")
-
         range_key = (request.query_params.get("range") or "").strip().lower()
+        want_bar = request.query_params.get("bar") in ("1", "true", "yes")
+        buckets_raw = request.query_params.get("buckets")
+
+        # Time-aligned bar: ?range=10m&bar=1  (or &buckets=N)
+        if range_key in DEFAULT_BUCKETS and (want_bar or buckets_raw is not None):
+            try:
+                buckets = int(buckets_raw) if buckets_raw not in (None, "") else 0
+            except ValueError:
+                buckets = 0
+            if buckets <= 0:
+                buckets = DEFAULT_BUCKETS[range_key]
+            return Response(time_buckets(monitor, range_key, buckets))
+
+        qs = CheckResult.objects.filter(monitor=monitor).order_by("-checked_at")
         if range_key in RANGE_DELTAS:
-            since = timezone.now() - RANGE_DELTAS[range_key]
-            qs = qs.filter(checked_at__gte=since)
-
-        try:
-            buckets = int(request.query_params.get("buckets", "0"))
-        except ValueError:
-            buckets = 0
-        buckets = max(0, min(buckets, 120))
-
+            qs = qs.filter(checked_at__gte=timezone.now() - RANGE_DELTAS[range_key])
         try:
             limit = min(int(request.query_params.get("limit", 50)), 2000)
         except ValueError:
             limit = 50
+        return Response(CheckResultSerializer(qs[:limit], many=True).data)
 
-        if buckets > 0:
-            # Pull enough raw points to fill buckets for the selected window.
-            rows = list(qs[: max(limit, buckets * 40)])
-            return Response(_bucket_results(rows, buckets))
+    @action(detail=True, methods=["get"], url_path="uptime")
+    def uptime(self, request, id=None):
+        monitor = self.get_object()
+        return Response(uptime_summary(monitor))
 
-        page = qs[:limit]
-        return Response(CheckResultSerializer(page, many=True).data)
+    @action(detail=True, methods=["post"], url_path="share")
+    def share(self, request, id=None):
+        """Enable / disable public status page (shareable link, no login)."""
+        import secrets
+
+        monitor = self.get_object()
+        want = request.data.get("is_public")
+        if want is None:
+            want = not monitor.is_public
+        want = bool(want)
+        if want:
+            if not monitor.public_slug:
+                monitor.public_slug = secrets.token_urlsafe(9)
+            monitor.is_public = True
+        else:
+            monitor.is_public = False
+            # Keep slug so re-enable reuses the same link; clear if asked.
+            if request.data.get("rotate_slug"):
+                monitor.public_slug = secrets.token_urlsafe(9)
+        monitor.save(update_fields=["is_public", "public_slug", "updated_at"])
+        return Response(MonitorSerializer(monitor).data)
 
     @action(detail=True, methods=["post"], url_path="check")
     def check_now(self, request, id=None):
@@ -165,3 +141,31 @@ class MonitorViewSet(viewsets.ModelViewSet):
         data = MonitorSerializer(monitor).data
         data["api_key"] = raw
         return Response(data)
+
+
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def public_status(request, slug: str):
+    """Public share page data — status + bar + uptime only (no keys / owner)."""
+    try:
+        monitor = Monitor.objects.get(public_slug=slug, is_public=True)
+    except Monitor.DoesNotExist:
+        return Response({"detail": "Not found"}, status=status.HTTP_404_NOT_FOUND)
+
+    range_key = (request.query_params.get("range") or "1h").strip().lower()
+    if range_key not in DEFAULT_BUCKETS:
+        range_key = "1h"
+
+    return Response(
+        {
+            "name": monitor.name,
+            "type": monitor.type,
+            "target": monitor.target,
+            "status": monitor.status,
+            "last_checked_at": monitor.last_checked_at,
+            "interval_seconds": monitor.interval_seconds,
+            "range": range_key,
+            "bar": time_buckets(monitor, range_key),
+            "uptime": uptime_summary(monitor),
+        }
+    )
