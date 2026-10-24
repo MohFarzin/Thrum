@@ -96,7 +96,8 @@ export function MonitorDetail() {
   const canCheck = monitor.type === 'http' || monitor.type === 'tcp'
   const isHeartbeat = monitor.type === 'heartbeat'
   const latest = results[0]
-  const curl = `curl -X POST "${window.location.origin}/api/v1/heartbeat/${monitor.id}/" \\\n  -H "Authorization: Bearer ${revealedKey || 'YOUR_API_KEY'}" \\\n  -H "Content-Type: application/json" \\\n  -d '{"status":"ok"}'`
+  // One-line curl works in Windows CMD and Unix shells (no bash \\ continuations).
+  const curl = `curl -X POST "${window.location.origin}/api/v1/heartbeat/${monitor.id}/" -H "Authorization: Bearer ${revealedKey || 'YOUR_API_KEY'}" -H "Content-Type: application/json" -d "{\\"status\\":\\"ok\\"}"`
 
   return (
     <section className="page">
