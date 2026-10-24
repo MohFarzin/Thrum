@@ -87,7 +87,7 @@ export function PublicStatus() {
       </div>
       <div className="detail-panel">
         <p className="meta">Last hour</p>
-        <HeartbeatBar status={data.status} results={data.bar} interactive={false} ageFade />
+        <HeartbeatBar status={data.status} results={data.bar} interactive={false} />
       </div>
       <p className="meta foot-note">Shared status page · refreshes every 20s</p>
     </section>

@@ -91,7 +91,6 @@ export function MonitorsList() {
                 status={m.status}
                 results={withinWindow(m.recent_results, 60 * 60 * 1000)}
                 interactive={false}
-                ageFade
               />
               <div className="monitor-card-foot">
                 <span className="type-chip">{m.type}</span>

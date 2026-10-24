@@ -28,8 +28,6 @@ export function MonitorHistory() {
   const [results, setResults] = useState<BarSegment[]>([])
   const [list, setList] = useState<CheckResult[]>([])
   const [error, setError] = useState('')
-  const [showNotes, setShowNotes] = useState(false)
-
   const load = useCallback(async () => {
     if (!user || !id) return
     const [m, buckets, recent] = await Promise.all([
@@ -81,19 +79,12 @@ export function MonitorHistory() {
         ))}
       </div>
 
-      <div className="detail-panel">
-        <HeartbeatBar
-          status={monitor.status}
-          results={results}
-          ageFade={range === '7d' || range === '30d' || range === '60d'}
-        />
+      <div className="detail-panel avail-panel">
+        <HeartbeatBar status={monitor.status} results={results} />
       </div>
 
       <div className="row-between section-head">
         <h2>Checks</h2>
-        <button type="button" className="text-toggle" onClick={() => setShowNotes((v) => !v)}>
-          {showNotes ? 'Hide notes' : 'Show notes'}
-        </button>
       </div>
       <ul className="check-list">
         {list.map((r) => (
@@ -104,9 +95,7 @@ export function MonitorHistory() {
               {r.latency_ms != null ? `${r.latency_ms}ms` : '—'}
               {r.status_code != null ? ` · HTTP ${r.status_code}` : ''}
             </span>
-            {showNotes && !r.success && r.error_message ? (
-              <span className="err-msg">{r.error_message}</span>
-            ) : null}
+            {!r.success && r.error_message ? <span className="err-msg">{r.error_message}</span> : null}
           </li>
         ))}
       </ul>

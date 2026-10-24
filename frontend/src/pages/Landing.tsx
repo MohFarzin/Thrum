@@ -137,7 +137,6 @@ export function Landing() {
                   status={m.status}
                   results={withinWindow(m.recent_results, 60 * 60 * 1000)}
                   interactive={false}
-                  ageFade
                 />
                 <div className="preview-meta">
                   <span>1h · {m.target || m.type}</span>

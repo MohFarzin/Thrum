@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Link, Navigate, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { api } from '../api/client'
 import type { BarSegment, CheckResult, Monitor, UptimeSummary } from '../api/types'
+import { ConfirmDialog } from '../components/ConfirmDialog'
 import { HeartbeatBar } from '../components/HeartbeatBar'
 import { HeartbeatCommands } from '../components/HeartbeatCommands'
 import { StatusPill } from '../components/StatusPill'
@@ -22,6 +23,8 @@ function fmtPct(v: number | null | undefined) {
   return `${v}%`
 }
 
+type ConfirmKind = 'delete' | 'rotate' | null
+
 export function MonitorDetail() {
   const { user, loading } = useAuth()
   const { id } = useParams()
@@ -31,17 +34,17 @@ export function MonitorDetail() {
   const [results, setResults] = useState<BarSegment[]>([])
   const [recentList, setRecentList] = useState<CheckResult[]>([])
   const [uptime, setUptime] = useState<UptimeSummary | null>(null)
-  const [range, setRange] = useState<BarRange>('30d')
+  const [range, setRange] = useState<BarRange>('1h')
   const [error, setError] = useState('')
   const [checking, setChecking] = useState(false)
   const [revealedKey, setRevealedKey] = useState<string | null>(
     () => (location.state as { apiKey?: string } | null)?.apiKey ?? null,
   )
-  const [rotating, setRotating] = useState(false)
   const [picked, setPicked] = useState<BarSegment | null>(null)
-  const [showNotes, setShowNotes] = useState(false)
   const [favBusy, setFavBusy] = useState(false)
-  const [shareBusy, setShareBusy] = useState(false)
+  const [confirm, setConfirm] = useState<ConfirmKind>(null)
+  const [confirmBusy, setConfirmBusy] = useState(false)
+  const [refreshing, setRefreshing] = useState(false)
 
   const load = useCallback(async () => {
     if (!user || !id) return
@@ -69,12 +72,6 @@ export function MonitorDetail() {
   if (loading) return <p className="meta">Loading…</p>
   if (!user) return <Navigate to="/login" replace />
 
-  async function onDelete() {
-    if (!id || !confirm('Delete this monitor?')) return
-    await api(`/api/monitors/${id}/`, { method: 'DELETE' })
-    navigate('/monitors')
-  }
-
   async function onCheckNow() {
     if (!id) return
     setChecking(true)
@@ -93,18 +90,16 @@ export function MonitorDetail() {
     }
   }
 
-  async function onRotateKey() {
-    if (!id || !confirm('Rotate API key? The old key stops working immediately.')) return
-    setRotating(true)
+  async function onRefreshBar() {
+    setRefreshing(true)
     setError('')
     try {
-      const res = await api<Monitor>(`/api/monitors/${id}/rotate-key/`, { method: 'POST' })
-      setMonitor(res)
-      if (res.api_key) setRevealedKey(res.api_key)
+      await load()
+      setPicked(null)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Rotate failed')
+      setError(err instanceof Error ? err.message : 'Refresh failed')
     } finally {
-      setRotating(false)
+      setRefreshing(false)
     }
   }
 
@@ -124,19 +119,25 @@ export function MonitorDetail() {
     }
   }
 
-  async function onToggleShare() {
-    if (!monitor || shareBusy) return
-    setShareBusy(true)
+  async function runConfirm() {
+    if (!id || !confirm) return
+    setConfirmBusy(true)
+    setError('')
     try {
-      const updated = await api<Monitor>(`/api/monitors/${monitor.id}/share/`, {
-        method: 'POST',
-        body: JSON.stringify({ is_public: !monitor.is_public }),
-      })
-      setMonitor(updated)
+      if (confirm === 'delete') {
+        await api(`/api/monitors/${id}/`, { method: 'DELETE' })
+        navigate('/monitors')
+        return
+      }
+      const res = await api<Monitor>(`/api/monitors/${id}/rotate-key/`, { method: 'POST' })
+      setMonitor(res)
+      if (res.api_key) setRevealedKey(res.api_key)
+      setConfirm(null)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Share update failed')
+      setError(err instanceof Error ? err.message : 'Action failed')
+      setConfirm(null)
     } finally {
-      setShareBusy(false)
+      setConfirmBusy(false)
     }
   }
 
@@ -149,11 +150,6 @@ export function MonitorDetail() {
   const hbUrl = `${window.location.origin}/api/v1/heartbeat/${monitor.id}/`
   const hbKey = revealedKey || 'YOUR_API_KEY'
   const sleepSec = Math.max(15, Math.floor(monitor.interval_seconds / 2))
-  const ageFade = range === '7d' || range === '30d'
-  const shareUrl =
-    monitor.is_public && monitor.public_slug
-      ? `${window.location.origin}/s/${monitor.public_slug}`
-      : null
 
   return (
     <section className="page">
@@ -190,7 +186,7 @@ export function MonitorDetail() {
           <Link className="btn ghost" to={`/monitors/${monitor.id}/edit`}>
             Edit
           </Link>
-          <button type="button" className="btn danger" onClick={() => void onDelete()}>
+          <button type="button" className="btn danger" onClick={() => setConfirm('delete')}>
             Delete
           </button>
         </div>
@@ -219,16 +215,11 @@ export function MonitorDetail() {
             </p>
           )}
           <div className="actions">
-            <button
-              type="button"
-              className="btn tiny"
-              disabled={rotating}
-              onClick={() => void onRotateKey()}
-            >
-              {rotating ? 'Rotating…' : 'Rotate key'}
+            <button type="button" className="btn tiny" onClick={() => setConfirm('rotate')}>
+              Rotate key
             </button>
           </div>
-          <p className="meta" style={{ marginTop: '1rem' }}>
+          <p className="meta" style={{ marginTop: '0.85rem' }}>
             Window: every{' '}
             <strong>{monitor.interval_seconds + monitor.heartbeat_grace_seconds}s</strong> (interval{' '}
             {monitor.interval_seconds}s + grace {monitor.heartbeat_grace_seconds}s).
@@ -237,105 +228,51 @@ export function MonitorDetail() {
         </div>
       ) : null}
 
-      <div className="detail-panel">
-        <div className="row-between" style={{ marginBottom: '0.65rem' }}>
+      <div className="detail-panel avail-panel">
+        <div className="row-between avail-head">
           <h2 style={{ margin: 0 }}>Availability</h2>
-          <div className="range-tabs" role="tablist" aria-label="Bar range">
-            {DETAIL_RANGES.map((r) => (
-              <button
-                key={r.id}
-                type="button"
-                role="tab"
-                aria-selected={range === r.id}
-                className={`range-tab${range === r.id ? ' on' : ''}`}
-                onClick={() => {
-                  setRange(r.id)
-                  setPicked(null)
-                }}
-              >
-                {r.label}
-              </button>
-            ))}
-          </div>
-        </div>
-        <div className="uptime-row" aria-label="Uptime">
-          <span>
-            <em>10m</em> {fmtPct(uptime?.['10m'])}
-          </span>
-          <span>
-            <em>1h</em> {fmtPct(uptime?.['1h'])}
-          </span>
-          <span>
-            <em>1d</em> {fmtPct(uptime?.['1d'])}
-          </span>
-          <span>
-            <em>1w</em> {fmtPct(uptime?.['7d'])}
-          </span>
-          <span>
-            <em>30d</em> {fmtPct(uptime?.['30d'])}
-          </span>
-        </div>
-        <p className="meta" style={{ marginBottom: '0.65rem' }}>
-          Last check {fmtTime(monitor.last_checked_at)}
-          {latest?.latency_ms != null ? ` · ${latest.latency_ms} ms` : ''}
-          {monitor.consecutive_failures > 0
-            ? ` · ${monitor.consecutive_failures} consecutive fail${monitor.consecutive_failures === 1 ? '' : 's'}`
-            : ''}
-        </p>
-        <HeartbeatBar
-          status={monitor.status}
-          results={results}
-          ageFade={ageFade}
-          onSelect={setPicked}
-        />
-        <p className="meta picked-slot">
-          {picked
-            ? `Selected: ${fmtTime(picked.checked_at)}${picked.success === true ? ' · OK' : picked.success === false ? ' · fail' : ' · gap'}${picked.latency_ms != null ? ` · ${picked.latency_ms} ms` : ''}${picked.status_code != null ? ` · HTTP ${picked.status_code}` : ''}${showNotes && picked.error_message ? ` · ${picked.error_message}` : ''}`
-            : results.length === 0
-              ? canCheck
-                ? 'No checks yet — wait for the scheduler or hit Check now.'
-                : isHeartbeat
-                  ? 'Waiting for the first agent heartbeat.'
-                  : 'No data yet.'
-              : '\u00a0'}
-        </p>
-        <button type="button" className="text-toggle" onClick={() => setShowNotes((v) => !v)}>
-          {showNotes ? 'Hide notes' : 'Notes'}
-        </button>
-      </div>
-
-      <div className="detail-panel">
-        <div className="row-between">
-          <h2 style={{ margin: 0 }}>Public status</h2>
-          <button
-            type="button"
-            className="btn tiny ghost"
-            disabled={shareBusy}
-            onClick={() => void onToggleShare()}
-          >
-            {monitor.is_public ? 'Turn off sharing' : 'Share status'}
-          </button>
-        </div>
-        <p className="meta">
-          Anyone with the link can see status and uptime — no login. Keys stay private.
-        </p>
-        {shareUrl ? (
-          <div className="share-line">
-            <code className="key-reveal">{shareUrl}</code>
+          <div className="avail-controls">
+            <div className="range-tabs" role="tablist" aria-label="Bar range">
+              {DETAIL_RANGES.map((r) => (
+                <button
+                  key={r.id}
+                  type="button"
+                  role="tab"
+                  aria-selected={range === r.id}
+                  className={`range-tab${range === r.id ? ' on' : ''}`}
+                  onClick={() => {
+                    setRange(r.id)
+                    setPicked(null)
+                  }}
+                >
+                  {r.label}
+                </button>
+              ))}
+            </div>
             <button
               type="button"
               className="btn tiny ghost"
-              onClick={() => void navigator.clipboard.writeText(shareUrl)}
+              disabled={refreshing}
+              onClick={() => void onRefreshBar()}
             >
-              Copy link
+              {refreshing ? 'Refreshing…' : 'Refresh'}
             </button>
-            <a className="text-toggle" href={shareUrl} target="_blank" rel="noreferrer">
-              Open
-            </a>
           </div>
-        ) : (
-          <p className="meta">Sharing is off.</p>
-        )}
+        </div>
+        <p className="meta avail-meta">
+          <span className="uptime-inline">
+            10m {fmtPct(uptime?.['10m'])} · 1h {fmtPct(uptime?.['1h'])} · 1d {fmtPct(uptime?.['1d'])}{' '}
+            · 1w {fmtPct(uptime?.['7d'])} · 30d {fmtPct(uptime?.['30d'])}
+          </span>
+          <span>
+            · Last {fmtTime(monitor.last_checked_at)}
+            {latest?.latency_ms != null ? ` · ${latest.latency_ms} ms` : ''}
+            {picked
+              ? ` · ${picked.success === true ? 'OK' : picked.success === false ? 'fail' : 'gap'}${picked.error_message ? ` (${picked.error_message})` : ''}`
+              : ''}
+          </span>
+        </p>
+        <HeartbeatBar status={monitor.status} results={results} onSelect={setPicked} />
       </div>
 
       <dl className="detail-grid">
@@ -387,9 +324,7 @@ export function MonitorDetail() {
                   {r.latency_ms != null ? `${r.latency_ms}ms` : '—'}
                   {r.status_code != null ? ` · HTTP ${r.status_code}` : ''}
                 </span>
-                {showNotes && !r.success && r.error_message ? (
-                  <span className="err-msg">{r.error_message}</span>
-                ) : null}
+                {!r.success && r.error_message ? <span className="err-msg">{r.error_message}</span> : null}
               </li>
             ))}
           </ul>
@@ -397,6 +332,26 @@ export function MonitorDetail() {
           <p className="meta">No checks in the last day.</p>
         )}
       </div>
+
+      <ConfirmDialog
+        open={confirm === 'delete'}
+        title="Delete monitor?"
+        body="This removes the monitor and its check history. This cannot be undone."
+        confirmLabel="Delete"
+        danger
+        busy={confirmBusy}
+        onCancel={() => setConfirm(null)}
+        onConfirm={() => void runConfirm()}
+      />
+      <ConfirmDialog
+        open={confirm === 'rotate'}
+        title="Rotate API key?"
+        body="The current key stops working immediately. Copy the new key when it appears."
+        confirmLabel="Rotate"
+        busy={confirmBusy}
+        onCancel={() => setConfirm(null)}
+        onConfirm={() => void runConfirm()}
+      />
     </section>
   )
 }

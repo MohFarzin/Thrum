@@ -25,6 +25,8 @@ export type BarSegment = {
   error_message: string
   status_code: number | null
   tone?: 'up' | 'warn' | 'down' | 'empty'
+  /** 0..1 share of checks OK in this slot (for green strength). */
+  success_rate?: number | null
   bucket_start?: string
   bucket_end?: string
 }
