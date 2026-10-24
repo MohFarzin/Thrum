@@ -15,11 +15,12 @@ You are building **THRUM** from scratch in this folder. Follow this brief exactl
 
 ## Runtime model (locked)
 
-- **Host (server):** THRUM runs **entirely in Docker** (Docker Compose). Web API, React frontend (served for production), PostgreSQL, Redis, Celery worker, Celery beat — all containerized.
+- **Host (server) — preferred:** THRUM runs **entirely in Docker Compose**. Web API, React frontend (served for production), PostgreSQL, Redis, Celery worker, Celery beat, reverse proxy — all containerized as separate Compose services.
+- **Pterodactyl panel — all-in-one egg (also locked):** Panel users must get **easy peasy** install: import egg → create server → start. **One container** embeds PostgreSQL + Redis + Gunicorn + Celery + built React (WhiteNoise). **No separate database server, no separate Redis server, no DATABASE_URL / REDIS_URL for the user to fill.** Egg lives in-repo at `pterodactyl/egg-thrum.json`; runtime image `pterodactyl/Dockerfile` (`thrum-pterodactyl:latest`, built once on the Wings node). Document in README.
 - **Clients (agents):** Can run **anywhere** (game server, website VPS, home PC, CI). They only need outbound HTTPS to POST heartbeats. No inbound ports required on the client.
 - **Also supported without agents:** Server-side **HTTP** and **TCP** polling from the THRUM host containers.
 
-Local dev may use Compose too (preferred) so prod and dev match.
+Local / preferred prod: Compose. Panel / quick self-host: all-in-one egg. Same product; two runtimes.
 
 ## Stack (locked)
 

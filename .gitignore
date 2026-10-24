@@ -36,6 +36,9 @@ Thumbs.db
 # Docker
 docker-data/
 
+# Local scratch for egg image builds / embedded data
+pterodactyl-data/
+
 # Coverage
 htmlcov/
 .coverage

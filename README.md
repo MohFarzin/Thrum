@@ -60,16 +60,17 @@ docker compose up --build
 
 Low-RAM tip: Celery worker concurrency is `2` in Compose; drop to `1` on tiny hosts.
 
-### Pterodactyl egg (panel)
+### Pterodactyl egg (panel) — all-in-one
 
-Pterodactyl cannot run Docker Compose inside one server. Use the published egg if you want install/start/console from the panel:
+**No separate database. No separate Redis.** One container runs Postgres + Redis + API + Celery + UI.
 
-1. Download / import [`pterodactyl/egg-thrum.json`](./pterodactyl/egg-thrum.json) (Admin → Eggs → Import).
-2. Provide **PostgreSQL** and **Redis** (separate panel eggs or external URLs).
-3. Create a **THRUM** server; set `SECRET_KEY`, `DATABASE_URL`, `REDIS_URL`, `ALLOWED_HOSTS`.
-4. Install → Start. The egg clones [MohFarzin/Thrum](https://github.com/MohFarzin/Thrum), builds the UI, and runs Gunicorn + Celery in one container.
+1. On the Wings node, build once:  
+   `docker build -t thrum-pterodactyl:latest -f pterodactyl/Dockerfile .`  
+   (clone this repo first, or see [`pterodactyl/README.md`](./pterodactyl/README.md))
+2. Import [`pterodactyl/egg-thrum.json`](./pterodactyl/egg-thrum.json) (Admin → Eggs → Import).
+3. Create a **THRUM** server → set **Secret Key** → Install → Start.
 
-Details: [`pterodactyl/README.md`](./pterodactyl/README.md).
+The egg clones [MohFarzin/Thrum](https://github.com/MohFarzin/Thrum) and boots the embedded stack. Details: [`pterodactyl/README.md`](./pterodactyl/README.md).
 
 ## Creating monitors / Discord / heartbeat curl
 

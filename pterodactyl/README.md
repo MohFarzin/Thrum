@@ -1,29 +1,51 @@
-# THRUM Pterodactyl egg
+# THRUM Pterodactyl egg (all-in-one)
 
-Import [`egg-thrum.json`](./egg-thrum.json) into your panel (Admin → Eggs → Import).
+**One server. One container. No separate Postgres or Redis.**
 
-Pterodactyl runs **one container**. This egg clones THRUM from GitHub and runs **API + Celery worker + Celery beat** together. **Postgres and Redis are not inside the egg** — create them on the panel (or elsewhere) and paste URLs into the server variables.
+Import [`egg-thrum.json`](./egg-thrum.json), create a THRUM server, set `SECRET_KEY`, start. Embedded PostgreSQL + Redis + API + Celery all run inside that container.
 
-## Import
+## One-time: build the image on the Wings node
 
-1. Admin → Nests → pick a nest → **Import Egg** → upload `egg-thrum.json` (from this folder on GitHub).
-2. Create a **PostgreSQL** database the panel can reach (Postgres egg or external).
-3. Create a **Redis** instance the panel can reach (Redis egg or external).
-4. Create a server from the **THRUM** egg.
-5. Set variables (at least `SECRET_KEY`, `DATABASE_URL`, `REDIS_URL`, `ALLOWED_HOSTS`).
-6. Allocate a port; open that port (or put a reverse proxy / SSL in front).
-7. Install / start. Console should show migrate + gunicorn listening.
+Pterodactyl cannot use Docker Compose inside an egg. This image packs Postgres + Redis + Python into the runtime the egg uses.
 
-Default Git repo: `https://github.com/MohFarzin/Thrum.git` (branch `main`).
+SSH to the **Wings / node** machine (Docker host):
 
-## What the egg does
+```bash
+git clone https://github.com/MohFarzin/Thrum.git /tmp/thrum-build
+cd /tmp/thrum-build
+docker build -t thrum-pterodactyl:latest -f pterodactyl/Dockerfile .
+rm -rf /tmp/thrum-build
+```
 
-| Step | Behavior |
-|------|----------|
-| Install | `git clone` (or pull) → `pip install` → `npm run build` |
-| Start | optional `git pull` → migrate → Celery worker + beat → Gunicorn on `SERVER_PORT` |
-| UI | Built React app served by Django/WhiteNoise (no Nginx in this mode) |
+The egg expects the image name `thrum-pterodactyl:latest` (local to that node).
 
-## Preferred alternative
+## Panel steps
 
-For the full multi-container stack (Nginx + separate services), use **Docker Compose** on the host — see the main README. The egg exists so you can run/test from the panel without host Compose.
+1. Admin → Eggs → **Import** → `pterodactyl/egg-thrum.json`
+2. Create a server from egg **THRUM**
+3. Set **Secret Key** (32+ random characters). Optional: `ALLOWED_HOSTS`, `THRUM_PUBLIC_BASE_URL`
+4. Allocate a port → **Install** → **Start**
+5. Open `http://SERVER_IP:PORT/` and `http://SERVER_IP:PORT/api/health/`
+
+No `DATABASE_URL`. No `REDIS_URL`. Data lives under `/home/container/data/` in the server files.
+
+## What runs inside
+
+| Process | Role |
+|---------|------|
+| Postgres | Embedded, `127.0.0.1:5432` |
+| Redis | Embedded, `127.0.0.1:6379` |
+| Celery worker + beat | Background jobs |
+| Gunicorn | HTTP API + React UI (WhiteNoise) |
+
+Install clones GitHub and builds the frontend; start boots the embedded stack.
+
+## vs Docker Compose
+
+| | Pterodactyl egg | Host Compose |
+|--|-----------------|--------------|
+| Effort | Import egg + build image once | `docker compose up` |
+| Containers | **One** all-in-one | Separate db/redis/api/worker/beat/proxy |
+| Best for | Panel users / quick test | Preferred production self-host |
+
+Compose remains the documented preferred production layout. The egg exists so panel users get “create server → start” without wiring databases.
