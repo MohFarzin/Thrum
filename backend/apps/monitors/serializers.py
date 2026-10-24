@@ -1,10 +1,13 @@
 from rest_framework import serializers
 
+from .keys import assign_new_key
 from .models import CheckResult, Monitor
 from .ssrf import assert_safe_http_url, parse_tcp_target
 
 
 class MonitorSerializer(serializers.ModelSerializer):
+    api_key = serializers.CharField(read_only=True, required=False)
+
     class Meta:
         model = Monitor
         fields = [
@@ -24,6 +27,7 @@ class MonitorSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
             "api_key_prefix",
+            "api_key",
         ]
         read_only_fields = [
             "id",
@@ -34,7 +38,12 @@ class MonitorSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
             "api_key_prefix",
+            "api_key",
         ]
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._raw_api_key: str | None = None
 
     def validate(self, attrs):
         monitor_type = attrs.get("type") or getattr(self.instance, "type", None)
@@ -57,6 +66,21 @@ class MonitorSerializer(serializers.ModelSerializer):
             except ValueError as exc:
                 raise serializers.ValidationError({"target": str(exc)}) from exc
         return attrs
+
+    def create(self, validated_data):
+        monitor = Monitor(**validated_data)
+        if monitor.type == Monitor.Type.HEARTBEAT:
+            self._raw_api_key = assign_new_key(monitor)
+        monitor.save()
+        return monitor
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        if self._raw_api_key:
+            data["api_key"] = self._raw_api_key
+        else:
+            data.pop("api_key", None)
+        return data
 
 
 class CheckResultSerializer(serializers.ModelSerializer):

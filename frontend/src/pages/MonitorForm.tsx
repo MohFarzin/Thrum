@@ -69,7 +69,9 @@ export function MonitorForm() {
           method: 'POST',
           body: JSON.stringify(body),
         })
-        navigate(`/monitors/${created.id}`)
+        navigate(`/monitors/${created.id}`, {
+          state: created.api_key ? { apiKey: created.api_key } : undefined,
+        })
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Save failed')

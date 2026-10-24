@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Link, Navigate, useNavigate, useParams } from 'react-router-dom'
+import { Link, Navigate, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { api } from '../api/client'
 import type { CheckResult, Monitor } from '../api/types'
 import { HeartbeatBar } from '../components/HeartbeatBar'
@@ -19,10 +19,15 @@ export function MonitorDetail() {
   const { user, loading } = useAuth()
   const { id } = useParams()
   const navigate = useNavigate()
+  const location = useLocation()
   const [monitor, setMonitor] = useState<Monitor | null>(null)
   const [results, setResults] = useState<CheckResult[]>([])
   const [error, setError] = useState('')
   const [checking, setChecking] = useState(false)
+  const [revealedKey, setRevealedKey] = useState<string | null>(
+    () => (location.state as { apiKey?: string } | null)?.apiKey ?? null,
+  )
+  const [rotating, setRotating] = useState(false)
 
   const load = useCallback(async () => {
     if (!user || !id) return
@@ -70,11 +75,28 @@ export function MonitorDetail() {
     }
   }
 
+  async function onRotateKey() {
+    if (!id || !confirm('Rotate API key? The old key stops working immediately.')) return
+    setRotating(true)
+    setError('')
+    try {
+      const res = await api<Monitor>(`/api/monitors/${id}/rotate-key/`, { method: 'POST' })
+      setMonitor(res)
+      if (res.api_key) setRevealedKey(res.api_key)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Rotate failed')
+    } finally {
+      setRotating(false)
+    }
+  }
+
   if (error && !monitor) return <p className="error">{error}</p>
   if (!monitor) return <p className="meta">Loading…</p>
 
   const canCheck = monitor.type === 'http' || monitor.type === 'tcp'
+  const isHeartbeat = monitor.type === 'heartbeat'
   const latest = results[0]
+  const curl = `curl -X POST "${window.location.origin}/api/v1/heartbeat/${monitor.id}/" \\\n  -H "Authorization: Bearer ${revealedKey || 'YOUR_API_KEY'}" \\\n  -H "Content-Type: application/json" \\\n  -d '{"status":"ok"}'`
 
   return (
     <section className="page">
@@ -109,6 +131,42 @@ export function MonitorDetail() {
       </div>
       {error ? <p className="error">{error}</p> : null}
 
+      {isHeartbeat ? (
+        <div className="detail-panel key-panel">
+          <h2>Agent API key</h2>
+          {revealedKey ? (
+            <>
+              <p className="warn-text">Copy now — this full key is only shown once.</p>
+              <code className="key-reveal">{revealedKey}</code>
+              <button
+                type="button"
+                className="btn tiny ghost"
+                onClick={() => void navigator.clipboard.writeText(revealedKey)}
+              >
+                Copy key
+              </button>
+            </>
+          ) : (
+            <p className="meta">
+              Prefix <code>{monitor.api_key_prefix || '—'}…</code> (full key hidden). Rotate to
+              mint a new one.
+            </p>
+          )}
+          <div className="actions">
+            <button
+              type="button"
+              className="btn tiny"
+              disabled={rotating}
+              onClick={() => void onRotateKey()}
+            >
+              {rotating ? 'Rotating…' : 'Rotate key'}
+            </button>
+          </div>
+          <h3 className="curl-heading">Send a heartbeat</h3>
+          <pre className="curl-block">{curl}</pre>
+        </div>
+      ) : null}
+
       <div className="detail-panel">
         <h2>Availability</h2>
         <HeartbeatBar status={monitor.status} segments={56} results={results} />
@@ -119,7 +177,9 @@ export function MonitorDetail() {
               }`
             : canCheck
               ? 'No checks yet — wait for the scheduler or hit Check now.'
-              : 'Heartbeat ingest arrives in Phase 3.'}
+              : isHeartbeat
+                ? 'Waiting for the first agent heartbeat.'
+                : 'No data yet.'}
         </p>
       </div>
 
@@ -134,7 +194,7 @@ export function MonitorDetail() {
             <dd>{monitor.expected_status_code}</dd>
           </>
         ) : null}
-        {monitor.type === 'heartbeat' ? (
+        {isHeartbeat ? (
           <>
             <dt>Grace</dt>
             <dd>{monitor.heartbeat_grace_seconds}s</dd>

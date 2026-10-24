@@ -7,7 +7,7 @@ from django.conf import settings
 from django.utils import timezone
 
 from .models import CheckResult, Monitor
-from .services import run_monitor_check
+from .services import mark_heartbeat_miss, run_monitor_check
 
 
 @shared_task(name="monitors.run_check", ignore_result=True)
@@ -37,6 +37,39 @@ def enqueue_due_checks() -> int:
             if count >= 200:
                 break
     return count
+
+
+@shared_task(name="monitors.heartbeat_watchdog", ignore_result=True)
+def heartbeat_watchdog() -> int:
+    """Mark heartbeat monitors down when interval + grace since last beat has passed."""
+    now = timezone.now()
+    monitors = Monitor.objects.filter(
+        is_enabled=True,
+        type=Monitor.Type.HEARTBEAT,
+        last_heartbeat_at__isnull=False,
+    ).only(
+        "id",
+        "interval_seconds",
+        "heartbeat_grace_seconds",
+        "last_heartbeat_at",
+        "last_checked_at",
+        "consecutive_failures",
+        "status",
+    )[:500]
+    marked = 0
+    for monitor in monitors:
+        deadline = monitor.last_heartbeat_at + timedelta(
+            seconds=monitor.interval_seconds + monitor.heartbeat_grace_seconds
+        )
+        if now <= deadline:
+            continue
+        if monitor.last_checked_at and (
+            (now - monitor.last_checked_at).total_seconds() < monitor.interval_seconds
+        ):
+            continue
+        mark_heartbeat_miss(monitor)
+        marked += 1
+    return marked
 
 
 @shared_task(name="monitors.cleanup_check_results", ignore_result=True)

@@ -3,6 +3,7 @@ from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
+from .keys import assign_new_key
 from .models import CheckResult, Monitor
 from .serializers import CheckResultSerializer, MonitorSerializer
 from .services import run_monitor_check
@@ -52,3 +53,17 @@ class MonitorViewSet(viewsets.ModelViewSet):
                 "result": CheckResultSerializer(result).data if result else None,
             }
         )
+
+    @action(detail=True, methods=["post"], url_path="rotate-key")
+    def rotate_key(self, request, id=None):
+        monitor = self.get_object()
+        if monitor.type != Monitor.Type.HEARTBEAT:
+            return Response(
+                {"detail": "Only heartbeat monitors have API keys."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        raw = assign_new_key(monitor)
+        monitor.save(update_fields=["api_key_prefix", "api_key_hash", "updated_at"])
+        data = MonitorSerializer(monitor).data
+        data["api_key"] = raw
+        return Response(data)

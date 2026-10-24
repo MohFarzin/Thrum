@@ -34,7 +34,7 @@ function applyDom(theme: ThemeMode) {
   document.documentElement.dataset.theme = theme
   document.documentElement.style.colorScheme = theme
   const meta = document.querySelector('meta[name="theme-color"]')
-  if (meta) meta.setAttribute('content', theme === 'dark' ? '#070b09' : '#f4f7f5')
+  if (meta) meta.setAttribute('content', theme === 'dark' ? '#000000' : '#ffffff')
 }
 
 export function ThemeProvider({ children }: { children: ReactNode }) {

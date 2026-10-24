@@ -1,23 +1,24 @@
 :root,
 [data-theme='dark'] {
   color-scheme: dark;
-  --bg0: #070b09;
-  --bg1: #0e1612;
-  --panel: #121c17;
-  --panel-2: #16221c;
-  --text: #c8d6ce;
-  --text-h: #f3faf6;
-  --accent: #3dba7a;
-  --accent-2: #7dffb2;
-  --muted: #7d9488;
+  /* Absolute black base; green only as accent */
+  --bg0: #000000;
+  --bg1: #000000;
+  --panel: #0a0a0a;
+  --panel-2: #111111;
+  --text: #c8c8c8;
+  --text-h: #ffffff;
+  --accent: #2f9e68;
+  --accent-2: #3dba7a;
+  --muted: #888888;
   --danger: #e85d5d;
   --warn: #c9a227;
-  --line: #24352c;
-  --input-bg: #0b1410;
-  --btn-fg: #052214;
-  --shadow: 0 18px 50px rgba(0, 0, 0, 0.35);
-  --glow: rgba(61, 186, 122, 0.16);
-  --glow-2: rgba(30, 90, 70, 0.22);
+  --line: #1a1a1a;
+  --input-bg: #0a0a0a;
+  --btn-fg: #000000;
+  --shadow: 0 18px 50px rgba(0, 0, 0, 0.6);
+  --glow: rgba(47, 158, 104, 0.07);
+  --glow-2: rgba(47, 158, 104, 0.04);
   --radius: 14px;
   --sans: 'DM Sans', 'Segoe UI', sans-serif;
   --display: 'Syne', 'Trebuchet MS', sans-serif;
@@ -25,45 +26,45 @@
 
 [data-theme='light'] {
   color-scheme: light;
-  --bg0: #f4f7f5;
-  --bg1: #e8efea;
+  --bg0: #ffffff;
+  --bg1: #f5f5f5;
   --panel: #ffffff;
-  --panel-2: #f7faf8;
-  --text: #3a4a42;
-  --text-h: #0f1a14;
+  --panel-2: #fafafa;
+  --text: #333333;
+  --text-h: #000000;
   --accent: #1f8f5a;
   --accent-2: #157a4a;
-  --muted: #5c6f65;
+  --muted: #666666;
   --danger: #c43c3c;
   --warn: #9a7a12;
-  --line: #cfdad3;
+  --line: #e0e0e0;
   --input-bg: #ffffff;
   --btn-fg: #ffffff;
-  --shadow: 0 14px 40px rgba(15, 30, 22, 0.08);
-  --glow: rgba(31, 143, 90, 0.12);
-  --glow-2: rgba(20, 80, 55, 0.08);
+  --shadow: 0 14px 40px rgba(0, 0, 0, 0.08);
+  --glow: rgba(31, 143, 90, 0.08);
+  --glow-2: rgba(31, 143, 90, 0.04);
 }
 
 @media (prefers-color-scheme: light) {
   :root:not([data-theme]) {
     color-scheme: light;
-    --bg0: #f4f7f5;
-    --bg1: #e8efea;
+    --bg0: #ffffff;
+    --bg1: #f5f5f5;
     --panel: #ffffff;
-    --panel-2: #f7faf8;
-    --text: #3a4a42;
-    --text-h: #0f1a14;
+    --panel-2: #fafafa;
+    --text: #333333;
+    --text-h: #000000;
     --accent: #1f8f5a;
     --accent-2: #157a4a;
-    --muted: #5c6f65;
+    --muted: #666666;
     --danger: #c43c3c;
     --warn: #9a7a12;
-    --line: #cfdad3;
+    --line: #e0e0e0;
     --input-bg: #ffffff;
     --btn-fg: #ffffff;
-    --shadow: 0 14px 40px rgba(15, 30, 22, 0.08);
-    --glow: rgba(31, 143, 90, 0.12);
-    --glow-2: rgba(20, 80, 55, 0.08);
+    --shadow: 0 14px 40px rgba(0, 0, 0, 0.08);
+    --glow: rgba(31, 143, 90, 0.08);
+    --glow-2: rgba(31, 143, 90, 0.04);
   }
 }
 

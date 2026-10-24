@@ -1,4 +1,4 @@
-"""Apply probe results to Monitor + CheckResult rows."""
+"""Apply probe / heartbeat results to Monitor + CheckResult rows."""
 
 from __future__ import annotations
 
@@ -54,3 +54,49 @@ def run_monitor_check(monitor_id) -> CheckResult | None:
         return None
     probe = probe_monitor(monitor)
     return apply_probe(monitor, probe)
+
+
+@transaction.atomic
+def record_heartbeat(monitor: Monitor, message: str = "") -> Monitor:
+    monitor = Monitor.objects.select_for_update().get(pk=monitor.pk)
+    now = timezone.now()
+    monitor.last_heartbeat_at = now
+    monitor.last_checked_at = now
+    monitor.consecutive_failures = 0
+    monitor.status = Monitor.Status.UP
+    monitor.save(
+        update_fields=[
+            "last_heartbeat_at",
+            "last_checked_at",
+            "consecutive_failures",
+            "status",
+            "updated_at",
+        ]
+    )
+    CheckResult.objects.create(
+        monitor=monitor,
+        success=True,
+        latency_ms=None,
+        error_message=(message or "")[:500],
+        status_code=None,
+    )
+    return monitor
+
+
+@transaction.atomic
+def mark_heartbeat_miss(monitor: Monitor) -> None:
+    monitor = Monitor.objects.select_for_update().get(pk=monitor.pk)
+    monitor.consecutive_failures = (monitor.consecutive_failures or 0) + 1
+    monitor.last_checked_at = timezone.now()
+    if monitor.consecutive_failures >= failures_before_down():
+        monitor.status = Monitor.Status.DOWN
+    monitor.save(
+        update_fields=["consecutive_failures", "last_checked_at", "status", "updated_at"]
+    )
+    CheckResult.objects.create(
+        monitor=monitor,
+        success=False,
+        latency_ms=None,
+        error_message="Heartbeat missed (watchdog)",
+        status_code=None,
+    )

@@ -134,10 +134,21 @@ CELERY_BEAT_SCHEDULE = {
         "task": "monitors.enqueue_due_checks",
         "schedule": 30.0,
     },
+    "heartbeat-watchdog": {
+        "task": "monitors.heartbeat_watchdog",
+        "schedule": 30.0,
+    },
     "cleanup-check-results-daily": {
         "task": "monitors.cleanup_check_results",
         "schedule": 86400.0,
     },
+}
+
+CACHES = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.redis.RedisCache",
+        "LOCATION": REDIS_URL,
+    }
 }
 
 THRUM_PUBLIC_BASE_URL = os.environ.get("THRUM_PUBLIC_BASE_URL", "http://localhost")

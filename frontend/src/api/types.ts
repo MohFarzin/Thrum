@@ -24,6 +24,8 @@ export type Monitor = {
   created_at: string
   updated_at: string
   api_key_prefix: string
+  /** Present only once on create / rotate — never stored client-side permanently. */
+  api_key?: string
 }
 
 export type MonitorInput = {
