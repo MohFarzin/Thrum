@@ -1,0 +1,318 @@
+
+
+# Build THRUM — full project brief (execute this)
+
+You are building **THRUM** from scratch in this folder. Follow this brief exactly. Do not rename the product. Do not invent alternate product names.
+
+## Identity (locked)
+
+- **Name / spelling:** `THRUM` only (never Thrust, Trump, Thrumm, etc.)
+- **What it is:** Open-source self-hosted “tech heartbeat” monitoring platform — web UI + ingest API + alerts.
+- **Owner goal:** Freelancer / reusable open-source tool (not a job-placement toy).
+- **Related future products (do NOT build now):** `Kastora` (media/voice), `Quicktunnel` (VPS tunnel when no public IP). Design so THRUM can later sit behind Quicktunnel. Mention both only in README roadmap.
+
+**Tagline direction:** If it has a pulse, THRUM hears it.
+
+## Runtime model (locked)
+
+- **Host (server):** THRUM runs **entirely in Docker** (Docker Compose). Web API, React frontend (served for production), PostgreSQL, Redis, Celery worker, Celery beat — all containerized.
+- **Clients (agents):** Can run **anywhere** (game server, website VPS, home PC, CI). They only need outbound HTTPS to POST heartbeats. No inbound ports required on the client.
+- **Also supported without agents:** Server-side **HTTP** and **TCP** polling from the THRUM host containers.
+
+Local dev may use Compose too (preferred) so prod and dev match.
+
+## Stack (locked)
+
+- **Backend:** Python 3.12+, **Django**, **Django REST Framework** (or Django Ninja if you prefer one style — pick DRF unless you have a strong reason)
+- **Frontend:** **React** (Vite) + TypeScript
+- **DB:** PostgreSQL
+- **Jobs:** Celery + Redis (worker + beat)
+- **Auth (UI):** session or JWT — prefer simple, secure Django session + DRF for API; or JWT if SPA is fully decoupled. Document the choice.
+- **Agent auth:** per-monitor API keys (shown once; **hashed at rest**)
+- **Reverse proxy (prod Compose):** Nginx or Caddy in Compose serving the built React app and proxying `/api` (and admin) to Django
+- **Package mgmt:** clear `requirements.txt` or `pyproject.toml`; frontend `package.json`
+- **Optimize for:** low resource use on old hardware (e.g. home i3), few containers, sensible intervals, DB indexes, retention cleanup, no pointless microservices
+
+## Product scope
+
+### MUST ship (v1)
+
+1. User register / login / logout
+2. Monitors CRUD:
+   - Types: `http` | `tcp` | `heartbeat`
+   - Fields: name, target (URL or `host:port`), interval, timeout, expected status (HTTP), grace period (heartbeat), enabled flag
+3. Background checks for HTTP + TCP; store latency + success/failure
+4. Heartbeat ingest API (Simple tier) with API key
+5. Status: `up` | `down` | `unknown`; last check / last heartbeat; consecutive failures
+6. Check history with retention (default 14 days, configurable)
+7. Alerts on **state transitions** (down + recovery):
+   - **Email** (SMTP via env)
+   - **Discord** webhook
+8. React UI: dashboard, monitors list/detail, create/edit, alert channels, API key reveal/rotate, Simple API docs page
+9. Django admin for ops
+10. **Docker Compose one-command bring-up** with `.env.example`
+11. **Excellent README** (see below)
+12. Basic automated tests for authz, heartbeat auth, status transition, alert-once behavior
+
+### MUST NOT build in v1 (roadmap only)
+
+- Medium / High agent tiers (Minecraft player IP/login/mods, deep website fingerprinting, etc.)
+- Telegram / WhatsApp alerts (design an `AlertSender` interface so they can be added later)
+- Billing / multi-tenant SaaS
+- Public status pages product
+- Quicktunnel implementation
+- Mobile apps, K8s operator, AI anomaly detection
+
+## Architecture
+
+```text
+[React SPA] → Nginx/Caddy → Django/DRF API
+                                ↓
+                         PostgreSQL
+                                ↓
+                    Celery worker + beat ← Redis
+
+Clients anywhere:
+  curl/agent → POST /api/v1/heartbeat/<monitor_id>/  (API key)
+```
+
+### Suggested repo structure
+
+```text
+thrum/
+  README.md
+  LICENSE                 # MIT or Apache-2.0
+  .env.example
+  .gitignore
+  docker-compose.yml
+  docker-compose.dev.yml  # optional hot-reload overlay
+  Dockerfile              # multi-stage: backend and/or combined
+  Dockerfile.web          # if split
+  nginx/
+    default.conf
+  docs/
+    simple-api.md
+    self-hosting.md
+    security.md
+  backend/
+    manage.py
+    pyproject.toml or requirements.txt
+    thrum/                # project settings/urls/celery
+      settings/
+        base.py
+        local.py
+        production.py
+    apps/
+      accounts/
+      monitors/
+      ingest/
+      alerts/
+    tests/
+  frontend/
+    package.json
+    vite.config.ts
+    index.html
+    src/
+      main.tsx
+      api/
+      pages/
+      components/
+      hooks/
+```
+
+Keep apps focused:
+
+- `monitors` — Monitor, CheckResult, scheduling domain
+- `ingest` — heartbeat endpoints
+- `alerts` — channels, events, senders
+- `accounts` — only if needed beyond Django User
+
+## Data model (v1)
+
+**Monitor**
+
+- UUID primary key (public IDs)
+- owner (FK User)
+- name, type (`http`|`tcp`|`heartbeat`)
+- target (nullable for pure heartbeat)
+- interval_seconds, timeout_seconds
+- expected_status_code (HTTP)
+- heartbeat_grace_seconds
+- api_key_prefix + api_key_hash (never store raw key)
+- status (`up`|`down`|`unknown`)
+- last_checked_at, last_heartbeat_at
+- consecutive_failures
+- is_enabled
+- created_at, updated_at
+- Indexes on: owner, status, last_checked_at, type
+
+**CheckResult**
+
+- monitor FK, checked_at, success, latency_ms, error_message (short), status_code
+- Index on (monitor, checked_at)
+
+**AlertChannel**
+
+- owner FK, type (`email`|`discord`), config JSON, is_enabled
+
+**AlertEvent**
+
+- monitor FK, channel FK, kind (`down`|`up`), sent_at, success, error
+
+## API
+
+### Heartbeat (Simple tier) — clients anywhere
+
+`POST /api/v1/heartbeat/<monitor_uuid>/`  
+Auth header: `Authorization: Bearer <api_key>` or `X-Thrum-Key: <api_key>`
+
+Optional JSON body (strict size limit, e.g. 16–64KB):
+
+```json
+{
+  "status": "ok",
+  "message": "optional",
+  "metrics": { "players": 3 }
+}
+```
+
+Responses: `200 {"ok": true}` on success; `401` bad key; `413`/`400` on abuse/invalid.
+
+### Authenticated UI API
+
+REST endpoints for monitors, check results (paginated), alert channels, “check now”, API key rotate — all **object-level owned by current user**.
+
+## Workers / scheduling
+
+1. Enqueue due HTTP/TCP monitors
+2. Execute checks with hard timeouts; limited redirects for HTTP
+3. Heartbeat watchdog: if `now > last_heartbeat_at + interval + grace` → down
+4. Alert only on transitions; optional: require N consecutive failures (default 2) before down
+5. Daily retention cleanup for CheckResult
+
+## Security & sanitization (required)
+
+- Hash API keys at rest; show full key **once** on create/rotate
+- Rate-limit heartbeat and login
+- CSRF strategy correct for SPA+API choice; secure cookies in prod
+- `DEBUG=False` in production settings
+- `ALLOWED_HOSTS`, `CSRF_TRUSTED_ORIGINS` from env
+- Secrets only via env; never commit `.env`
+- HTTP monitor URL schemes: only `http`/`https`
+- Mitigate SSRF where practical (block link-local/metadata/`169.254.169.254`; document residual risk for self-hosted); prefer optional allowlist mode
+- Cap timeouts, body sizes, error message length; do not store raw response bodies
+- Escape/safe rendering in React; no `dangerouslySetInnerHTML` for user targets
+- Users can only access their own monitors
+- Non-root containers where possible
+- Do not log API keys, webhook URLs, or SMTP passwords
+
+**Privacy note for README:** future High tier (IPs, player data) is sensitive — not in v1.
+
+## Optimization requirements
+
+- Efficient Celery schedules (don’t spam; honor intervals)
+- DB indexes as above; pagination on history
+- Retention job mandatory
+- React: code-split routes; production build (minified) served by Nginx — **not** Vite dev server in prod Compose
+- Multi-stage Docker builds; slim Python image
+- Healthchecks on `web`, `db`, `redis`
+- Sensible defaults for low-RAM hosts (worker concurrency documented, e.g. 1–2)
+- Avoid extra services beyond: web/proxy, api/backend, worker, beat, db, redis
+
+## Docker (required deliverable)
+
+`docker compose up --build` (or documented equivalent) must start a working THRUM.
+
+Compose services at minimum:
+
+- `db` (Postgres)
+- `redis`
+- `api` (Django/gunicorn or uvicorn)
+- `worker` (Celery)
+- `beat` (Celery beat)
+- `proxy` or `web` (Nginx serving React build + reverse proxy to API)
+
+`.env.example` must document:
+
+- `SECRET_KEY`, `DEBUG`, `ALLOWED_HOSTS`
+- `POSTGRES_*`, `DATABASE_URL` or equivalent
+- `REDIS_URL`
+- `EMAIL_*` / SMTP
+- `THRUM_PUBLIC_BASE_URL` (used in alert links)
+- retention days, default check intervals
+
+Include a short **production** note: attach a domain, TLS (Caddy or external), and that Quicktunnel can publish this stack without a home public IP later.
+
+## React UI pages
+
+1. Landing (short)  
+2. Login / Register  
+3. Dashboard (counts + recent incidents)  
+4. Monitors list  
+5. Monitor detail (status, recent checks, latency, API key management, check now)  
+6. Create / Edit monitor  
+7. Alert channels  
+8. Simple API docs (curl examples)
+
+Clean, fast, readable status colors. No bloated marketing UI.
+
+## README (must be excellent)
+
+README must include:
+
+1. What THRUM is and who it’s for  
+2. Architecture diagram (text/mermaid)  
+3. Features (v1) + roadmap (Telegram, Medium/High tiers, Quicktunnel, Kastora)  
+4. Quick start with Docker Compose  
+5. Creating an HTTP monitor + Discord alert  
+6. Simple heartbeat curl from any client machine  
+7. Env var reference  
+8. Dev setup (backend + frontend) if different from Compose  
+9. Security notes (API keys, SSRF, secrets)  
+10. Updating / backup (Postgres volume)  
+11. License  
+
+Also add `docs/simple-api.md`, `docs/self-hosting.md`, `docs/security.md`.
+
+## Tests (minimum)
+
+- Heartbeat: valid key OK, invalid key 401  
+- User B cannot read/update user A’s monitor  
+- HTTP check mocked up/down updates status  
+- Down transition sends alert once (mocked sender); recovery sends once  
+
+## Implementation phases (do in order, commit-quality code)
+
+0. Skeleton: Docker Compose, Django project, React Vite, proxy wiring, health endpoint  
+1. Auth + Monitor models + React CRUD shell  
+2. Celery HTTP/TCP checkers + dashboard status  
+3. Heartbeat ingest + API keys + watchdog  
+4. Email + Discord alerts + AlertEvent  
+5. Harden: rate limits, retention, production settings, SSRF mitigations  
+6. Polish README/docs + tests + `compose up` verification notes  
+
+## Success criteria (done when)
+
+1. `docker compose up --build` brings THRUM up on a clean machine  
+2. Register user → create HTTP monitor → see up/down  
+3. Create heartbeat monitor → from **another machine**, curl heartbeat → stays up; stop → goes down + alert  
+4. Discord or email fires on down and on recovery  
+5. React production build is what Compose serves  
+6. Second user cannot see first user’s data  
+7. README lets a stranger self-host in under ~30 minutes  
+
+## Coding rules for this build
+
+- Smallest complete v1; no fake Medium/High features  
+- No unused abstractions  
+- Comment only non-obvious why  
+- Prefer existing Django/React patterns over custom frameworks  
+- Spelling in UI/docs/code comments: **THRUM**  
+- When unsure, choose the option that ships a reliable Dockerized monitor  
+
+## First action
+
+Scaffold the repo structure, Docker Compose, Django + React skeleton, and README outline, then implement phases 0→6 until success criteria pass.
+
+Start now.
+
