@@ -1,6 +1,7 @@
 import { Link, NavLink, Outlet } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 import { BrandMark } from './BrandMark'
+import { ThemeToggle } from './ThemeToggle'
 
 export function Layout() {
   const { user, logout } = useAuth()
@@ -31,6 +32,7 @@ export function Layout() {
               </Link>
             </>
           )}
+          <ThemeToggle />
         </nav>
       </header>
       <main className="content">

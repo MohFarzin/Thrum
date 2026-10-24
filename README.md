@@ -5,7 +5,7 @@
 Self-hosted uptime & heartbeat monitoring — one box, open source.
 
 <p align="center">
-  <img src="frontend/public/favicon.svg" alt="THRUM mark" width="72" height="72" />
+  <img src="frontend/public/logo.svg" alt="THRUM mark" width="72" height="72" />
 </p>
 
 Register → add HTTP / TCP / heartbeat monitors → see status. Alerts and remote agents come next.

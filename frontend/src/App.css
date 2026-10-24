@@ -12,9 +12,9 @@
   inset: 0;
   z-index: -1;
   background:
-    radial-gradient(ellipse 70% 45% at 15% -5%, rgba(61, 186, 122, 0.18), transparent 55%),
-    radial-gradient(ellipse 50% 40% at 90% 10%, rgba(30, 90, 70, 0.25), transparent 50%),
-    linear-gradient(165deg, var(--bg0), var(--bg1) 55%, #0a100e);
+    radial-gradient(ellipse 70% 45% at 15% -5%, var(--glow), transparent 55%),
+    radial-gradient(ellipse 50% 40% at 90% 10%, var(--glow-2), transparent 50%),
+    linear-gradient(165deg, var(--bg0), var(--bg1) 60%, var(--bg0));
 }
 
 .topbar {
@@ -68,6 +68,23 @@
   border-radius: 999px;
   background: var(--panel);
   border: 1px solid var(--line);
+}
+
+.theme-toggle {
+  padding: 0.35rem 0.7rem;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  color: var(--muted);
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.theme-toggle:hover {
+  color: var(--text-h);
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--line));
 }
 
 .content {
@@ -223,7 +240,7 @@
   border-radius: 10px;
   border: 1px solid var(--accent);
   background: var(--accent);
-  color: #052214;
+  color: var(--btn-fg);
   font-weight: 650;
   text-decoration: none;
   cursor: pointer;
@@ -282,7 +299,7 @@ select {
   padding: 0.65rem 0.75rem;
   border-radius: 10px;
   border: 1px solid var(--line);
-  background: #0b1410;
+  background: var(--input-bg);
   color: var(--text-h);
   font: inherit;
 }
@@ -480,7 +497,12 @@ label.check {
   background: linear-gradient(180deg, #ff8f8f, var(--danger));
 }
 .hb-unknown {
-  background: color-mix(in srgb, var(--muted) 55%, #2a3a32);
+  background: color-mix(in srgb, var(--muted) 55%, var(--line));
+}
+
+.brand-link img {
+  display: block;
+  border-radius: 7px;
 }
 
 .empty-card {
