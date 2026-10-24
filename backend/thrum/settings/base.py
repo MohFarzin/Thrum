@@ -54,6 +54,7 @@ _SPA_DIST = REPO_ROOT / "frontend" / "dist"
 # Egg / single-process mode: serve the built React app from Django (no Nginx).
 if _SPA_DIST.is_dir():
     WHITENOISE_ROOT = str(_SPA_DIST)
+    WHITENOISE_INDEX_FILE = True
 
 ROOT_URLCONF = "thrum.urls"
 

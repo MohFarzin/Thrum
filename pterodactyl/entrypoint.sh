@@ -1,14 +1,14 @@
 #!/bin/bash
-# Pterodactyl yolk-style entrypoint: run the panel STARTUP command.
 set -e
-cd /home/container
+cd /home/container || true
+export HOME=/home/container
 
-# Wings may pass {{VAR}} placeholders; expand any leftover brace vars from the env.
-STARTUP_CMD="${STARTUP}"
+STARTUP_CMD="${STARTUP:-bash /home/container/pterodactyl/start.sh}"
 if [[ "${STARTUP_CMD}" == *"{{"* ]]; then
   for var in $(compgen -e); do
     STARTUP_CMD="${STARTUP_CMD//\{\{${var}\}\}/${!var}}"
   done
 fi
 
+echo "==> THRUM entrypoint uid=$(id -u)"
 exec bash -lc "${STARTUP_CMD}"

@@ -7,16 +7,24 @@
 3. Create server → Install → Start  
 4. Read `SECRET_KEY` from console (first start) or `data/secret_key.txt`
 
-## One-time image build (Wings node)
+## One-time on the Wings/Docker host (required)
+
+Wings **must pull** an image. A local-only tag like `thrum-pterodactyl:latest` fails with `pull access denied`. Run this **once** on the node (as root/sudo):
 
 ```bash
-git clone https://github.com/MohFarzin/Thrum.git /tmp/thrum-build
-cd /tmp/thrum-build
-docker build -t thrum-pterodactyl:latest -f pterodactyl/Dockerfile .
-rm -rf /tmp/thrum-build
+# From a clone OR from an already-installed server volume that has pterodactyl/Dockerfile:
+sudo bash pterodactyl/host-bootstrap-image.sh /path/to/Thrum
+# Example after panel install:
+# sudo bash /var/lib/Jexactyl/volumes/<uuid>/pterodactyl/host-bootstrap-image.sh /var/lib/Jexactyl/volumes/<uuid>
 ```
 
-Egg image name: `thrum-pterodactyl:latest`.
+That script:
+
+1. Starts a local registry on `127.0.0.1:5000`
+2. Builds the all-in-one image
+3. Pushes `127.0.0.1:5000/thrum-pterodactyl:latest`
+
+In the panel, set the server Docker image to **`127.0.0.1:5000/thrum-pterodactyl:latest`** (included in the egg image list).
 
 ## Panel steps
 

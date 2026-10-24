@@ -10,6 +10,9 @@ export PYTHONPATH="/home/container/backend:${PYTHONPATH:-}"
 export DJANGO_SETTINGS_MODULE="${DJANGO_SETTINGS_MODULE:-thrum.settings.production}"
 export PYTHONUNBUFFERED=1
 
+# shellcheck disable=SC1091
+source /home/container/pterodactyl/nss-wrap.sh
+
 DATA_DIR="/home/container/data"
 PGDATA="${DATA_DIR}/postgres"
 REDIS_DIR="${DATA_DIR}/redis"

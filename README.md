@@ -23,16 +23,17 @@ You do **not** install a database or Redis. You do **not** invent a Secret Key.
 
 ### How to run (Pterodactyl) — easiest for panel users
 
-**1. Once** on the Wings/Docker host, build the image:
+**1. Once** on the Wings/Docker host (required — Wings must *pull* an image):
 
 ```bash
 git clone https://github.com/MohFarzin/Thrum.git /tmp/thrum-build
-cd /tmp/thrum-build
-docker build -t thrum-pterodactyl:latest -f pterodactyl/Dockerfile .
+sudo bash /tmp/thrum-build/pterodactyl/host-bootstrap-image.sh /tmp/thrum-build
 ```
 
-**2.** Import [`pterodactyl/egg-thrum.json`](./pterodactyl/egg-thrum.json) → create a **THRUM** server → **Install** → **Start**.  
-Defaults are fine. No Secret Key field to fill.
+That builds the all-in-one image and pushes it to `127.0.0.1:5000/thrum-pterodactyl:latest` (local registry). Details: [`pterodactyl/README.md`](./pterodactyl/README.md).
+
+**2.** Import [`pterodactyl/egg-thrum.json`](./pterodactyl/egg-thrum.json) → create a **THRUM** server → pick Docker image **local registry** → **Install** → **Start**.  
+No Secret Key to fill.
 
 **3.** Open the console on **first start**. You’ll see something like:
 

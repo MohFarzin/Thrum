@@ -7,10 +7,11 @@
     "exported_at": "2026-10-24T12:31:45.311Z",
     "name": "THRUM",
     "author": "mohfarzin@users.noreply.github.com",
-    "description": "THRUM — one container with embedded Postgres + Redis + API + Celery + UI. SECRET_KEY is auto-generated on first start (printed in console + saved to data/secret_key.txt). Build image once: docker build -t thrum-pterodactyl:latest -f pterodactyl/Dockerfile .",
+    "description": "THRUM one-container (embedded Postgres+Redis+API+Celery+UI). SECRET_KEY auto-generated. On Wings host run pterodactyl/host-bootstrap-image.sh once, then use image 127.0.0.1:5000/thrum-pterodactyl:latest.",
     "features": null,
     "docker_images": {
-        "THRUM All-in-one": "thrum-pterodactyl:latest"
+        "THRUM All-in-one (local registry)": "127.0.0.1:5000/thrum-pterodactyl:latest",
+        "THRUM All-in-one (local tag)": "thrum-pterodactyl:latest"
     },
     "file_denylist": [],
     "startup": "bash /home/container/pterodactyl/start.sh",
