@@ -1,14 +1,36 @@
-import type { MonitorStatus } from '../api/types'
+import type { CheckResult, MonitorStatus } from '../api/types'
 
-/** Uptime-Kuma-style segment bar (placeholder until real history exists). */
-export function HeartbeatBar({ status, segments = 40 }: { status: MonitorStatus; segments?: number }) {
+type Props = {
+  status: MonitorStatus
+  segments?: number
+  /** Newest-first results; used when present instead of status placeholder. */
+  results?: CheckResult[]
+}
+
+/** Uptime-style segment bar from recent check results (oldest → newest left→right). */
+export function HeartbeatBar({ status, segments = 40, results }: Props) {
+  const tones: Array<'up' | 'down' | 'unknown'> = []
+  if (results && results.length > 0) {
+    const chronological = [...results].reverse().slice(-segments)
+    for (const r of chronological) {
+      tones.push(r.success ? 'up' : 'down')
+    }
+    while (tones.length < segments) {
+      tones.unshift('unknown')
+    }
+  } else {
+    for (let i = 0; i < segments; i++) {
+      if (status === 'unknown') tones.push('unknown')
+      else if (status === 'up') tones.push('up')
+      else tones.push(i > segments - 4 ? 'down' : 'up')
+    }
+  }
+
   return (
     <div className="hb-bar" aria-hidden>
-      {Array.from({ length: segments }, (_, i) => {
-        const tone =
-          status === 'up' ? 'up' : status === 'down' ? (i > segments - 4 ? 'down' : 'up') : 'unknown'
-        return <span key={i} className={`hb-seg hb-${tone}`} />
-      })}
+      {tones.map((tone, i) => (
+        <span key={i} className={`hb-seg hb-${tone}`} />
+      ))}
     </div>
   )
 }

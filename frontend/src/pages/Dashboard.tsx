@@ -13,9 +13,13 @@ export function Dashboard() {
 
   useEffect(() => {
     if (!user) return
-    api<Monitor[]>('/api/monitors/')
-      .then(setMonitors)
-      .catch((err) => setError(err instanceof Error ? err.message : 'Failed to load'))
+    const load = () =>
+      api<Monitor[]>('/api/monitors/')
+        .then(setMonitors)
+        .catch((err) => setError(err instanceof Error ? err.message : 'Failed to load'))
+    void load()
+    const t = window.setInterval(() => void load(), 15000)
+    return () => window.clearInterval(t)
   }, [user])
 
   if (loading) return <p className="meta">Loading…</p>
@@ -93,7 +97,7 @@ export function Dashboard() {
           ))}
         </div>
       )}
-      <p className="meta foot-note">Live latency history arrives in Phase 2.</p>
+      <p className="meta foot-note">Status refreshes every 15s. Open a monitor for check history.</p>
     </section>
   )
 }

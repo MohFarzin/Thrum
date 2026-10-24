@@ -505,6 +505,46 @@ label.check {
   border-radius: 7px;
 }
 
+.check-list {
+  list-style: none;
+  margin: 0.75rem 0 0;
+  padding: 0;
+  display: grid;
+  gap: 0.55rem;
+}
+
+.check-list li {
+  display: grid;
+  grid-template-columns: 3.5rem 1fr auto;
+  gap: 0.35rem 0.75rem;
+  align-items: baseline;
+  font-size: 0.88rem;
+  padding-bottom: 0.45rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.check-list .ok {
+  color: var(--accent);
+  font-weight: 650;
+}
+
+.check-list .bad {
+  color: var(--danger);
+  font-weight: 650;
+}
+
+.check-list .err-msg {
+  grid-column: 1 / -1;
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+@media (max-width: 640px) {
+  .check-list li {
+    grid-template-columns: 3.5rem 1fr;
+  }
+}
+
 .empty-card {
   padding: 1.5rem;
   display: grid;

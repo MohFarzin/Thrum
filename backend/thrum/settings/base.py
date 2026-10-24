@@ -129,13 +129,23 @@ CELERY_BROKER_URL = REDIS_URL
 CELERY_RESULT_BACKEND = REDIS_URL
 CELERY_TASK_ALWAYS_EAGER = False
 CELERY_TIMEZONE = TIME_ZONE
-CELERY_BEAT_SCHEDULE = {}
+CELERY_BEAT_SCHEDULE = {
+    "enqueue-due-checks": {
+        "task": "monitors.enqueue_due_checks",
+        "schedule": 30.0,
+    },
+    "cleanup-check-results-daily": {
+        "task": "monitors.cleanup_check_results",
+        "schedule": 86400.0,
+    },
+}
 
 THRUM_PUBLIC_BASE_URL = os.environ.get("THRUM_PUBLIC_BASE_URL", "http://localhost")
 THRUM_CHECK_RETENTION_DAYS = int(os.environ.get("THRUM_CHECK_RETENTION_DAYS", "14"))
 THRUM_DEFAULT_CHECK_INTERVAL_SECONDS = int(
     os.environ.get("THRUM_DEFAULT_CHECK_INTERVAL_SECONDS", "60")
 )
+THRUM_FAILURES_BEFORE_DOWN = int(os.environ.get("THRUM_FAILURES_BEFORE_DOWN", "2"))
 
 EMAIL_HOST = os.environ.get("EMAIL_HOST", "")
 EMAIL_PORT = int(os.environ.get("EMAIL_PORT", "587"))

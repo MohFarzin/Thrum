@@ -36,3 +36,12 @@ export type MonitorInput = {
   heartbeat_grace_seconds: number
   is_enabled: boolean
 }
+
+export type CheckResult = {
+  id: number
+  checked_at: string
+  success: boolean
+  latency_ms: number | null
+  error_message: string
+  status_code: number | null
+}

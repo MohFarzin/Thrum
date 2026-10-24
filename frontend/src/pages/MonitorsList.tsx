@@ -13,9 +13,13 @@ export function MonitorsList() {
 
   useEffect(() => {
     if (!user) return
-    api<Monitor[]>('/api/monitors/')
-      .then(setMonitors)
-      .catch((err) => setError(err instanceof Error ? err.message : 'Failed to load'))
+    const load = () =>
+      api<Monitor[]>('/api/monitors/')
+        .then(setMonitors)
+        .catch((err) => setError(err instanceof Error ? err.message : 'Failed to load'))
+    void load()
+    const t = window.setInterval(() => void load(), 15000)
+    return () => window.clearInterval(t)
   }, [user])
 
   if (loading) return <p className="meta">Loading…</p>

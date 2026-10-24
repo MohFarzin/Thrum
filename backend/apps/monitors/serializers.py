@@ -1,6 +1,7 @@
 from rest_framework import serializers
 
-from .models import Monitor
+from .models import CheckResult, Monitor
+from .ssrf import assert_safe_http_url, parse_tcp_target
 
 
 class MonitorSerializer(serializers.ModelSerializer):
@@ -46,8 +47,27 @@ class MonitorSerializer(serializers.ModelSerializer):
                 {"target": "Target is required for HTTP and TCP monitors."}
             )
         if monitor_type == Monitor.Type.HTTP and target:
-            if not (target.startswith("http://") or target.startswith("https://")):
-                raise serializers.ValidationError(
-                    {"target": "HTTP monitors must use http:// or https:// URLs."}
-                )
+            try:
+                assert_safe_http_url(target)
+            except ValueError as exc:
+                raise serializers.ValidationError({"target": str(exc)}) from exc
+        if monitor_type == Monitor.Type.TCP and target:
+            try:
+                parse_tcp_target(target)
+            except ValueError as exc:
+                raise serializers.ValidationError({"target": str(exc)}) from exc
         return attrs
+
+
+class CheckResultSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = CheckResult
+        fields = [
+            "id",
+            "checked_at",
+            "success",
+            "latency_ms",
+            "error_message",
+            "status_code",
+        ]
+        read_only_fields = fields
