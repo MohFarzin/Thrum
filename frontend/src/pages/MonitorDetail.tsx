@@ -166,10 +166,12 @@ export function MonitorDetail() {
           </div>
           <h3 className="curl-heading">Send a heartbeat</h3>
           <p className="meta">
-            Keep sending at least every {monitor.interval_seconds + monitor.heartbeat_grace_seconds}s
-            (interval + grace). A single curl only proves one beat — after that the watchdog will
-            mark soft fails (orange) then down (red).
+            Window: every <strong>{monitor.interval_seconds + monitor.heartbeat_grace_seconds}s</strong>{' '}
+            (interval {monitor.interval_seconds}s + grace {monitor.heartbeat_grace_seconds}s). One curl =
+            one beat. Orange = first miss; red = second miss (alert). PowerShell loop:
           </p>
+          <pre className="curl-block">{`while ($true) { ${curl}; Start-Sleep -Seconds ${Math.max(15, Math.floor(monitor.interval_seconds / 2))} }`}</pre>
+          <p className="meta">Single shot (CMD):</p>
           <pre className="curl-block">{curl}</pre>
         </div>
       ) : null}

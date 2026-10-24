@@ -77,6 +77,21 @@ class MonitorSerializer(serializers.ModelSerializer):
                 parse_tcp_target(target)
             except ValueError as exc:
                 raise serializers.ValidationError({"target": str(exc)}) from exc
+        if monitor_type == Monitor.Type.HEARTBEAT:
+            interval = attrs.get("interval_seconds")
+            if interval is None and self.instance is not None:
+                interval = self.instance.interval_seconds
+            grace = attrs.get("heartbeat_grace_seconds")
+            if grace is None and self.instance is not None:
+                grace = self.instance.heartbeat_grace_seconds
+            if interval is not None and int(interval) < 30:
+                raise serializers.ValidationError(
+                    {"interval_seconds": "Heartbeat interval must be at least 30 seconds."}
+                )
+            if grace is not None and int(grace) < 30:
+                raise serializers.ValidationError(
+                    {"heartbeat_grace_seconds": "Heartbeat grace must be at least 30 seconds."}
+                )
         return attrs
 
     def create(self, validated_data):
