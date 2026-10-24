@@ -1,14 +1,13 @@
 # THRUM Pterodactyl egg (all-in-one)
 
-**One server. One container. No separate Postgres or Redis.**
+**One box. Auto Secret Key. No separate Postgres or Redis.**
 
-Import [`egg-thrum.json`](./egg-thrum.json), create a THRUM server, set `SECRET_KEY`, start. Embedded PostgreSQL + Redis + API + Celery all run inside that container.
+1. Build image once on Wings (below)  
+2. Import [`egg-thrum.json`](./egg-thrum.json)  
+3. Create server → Install → Start  
+4. Read `SECRET_KEY` from console (first start) or `data/secret_key.txt`
 
-## One-time: build the image on the Wings node
-
-Pterodactyl cannot use Docker Compose inside an egg. This image packs Postgres + Redis + Python into the runtime the egg uses.
-
-SSH to the **Wings / node** machine (Docker host):
+## One-time image build (Wings node)
 
 ```bash
 git clone https://github.com/MohFarzin/Thrum.git /tmp/thrum-build
@@ -17,35 +16,25 @@ docker build -t thrum-pterodactyl:latest -f pterodactyl/Dockerfile .
 rm -rf /tmp/thrum-build
 ```
 
-The egg expects the image name `thrum-pterodactyl:latest` (local to that node).
+Egg image name: `thrum-pterodactyl:latest`.
 
 ## Panel steps
 
-1. Admin → Eggs → **Import** → `pterodactyl/egg-thrum.json`
-2. Create a server from egg **THRUM**
-3. Set **Secret Key** (32+ random characters). Optional: `ALLOWED_HOSTS`, `THRUM_PUBLIC_BASE_URL`
-4. Allocate a port → **Install** → **Start**
-5. Open `http://SERVER_IP:PORT/` and `http://SERVER_IP:PORT/api/health/`
+1. Admin → Eggs → **Import** → `egg-thrum.json`  
+2. Create **THRUM** server (defaults OK)  
+3. Allocate a port → **Install** → **Start**  
+4. Console → look for `THRUM generated a SECRET_KEY`  
+5. Browse `http://IP:PORT/` and `/api/health/`
 
-No `DATABASE_URL`. No `REDIS_URL`. Data lives under `/home/container/data/` in the server files.
+### Find the secret again
 
-## What runs inside
+- Files → `data/secret_key.txt`  
+- Console: `cat /home/container/data/secret_key.txt`
 
-| Process | Role |
-|---------|------|
-| Postgres | Embedded, `127.0.0.1:5432` |
-| Redis | Embedded, `127.0.0.1:6379` |
-| Celery worker + beat | Background jobs |
-| Gunicorn | HTTP API + React UI (WhiteNoise) |
+## Inside the container
 
-Install clones GitHub and builds the frontend; start boots the embedded stack.
+Postgres + Redis + Celery + Gunicorn + React UI. Data under `/home/container/data/`.
 
-## vs Docker Compose
+## vs Compose
 
-| | Pterodactyl egg | Host Compose |
-|--|-----------------|--------------|
-| Effort | Import egg + build image once | `docker compose up` |
-| Containers | **One** all-in-one | Separate db/redis/api/worker/beat/proxy |
-| Best for | Panel users / quick test | Preferred production self-host |
-
-Compose remains the documented preferred production layout. The egg exists so panel users get “create server → start” without wiring databases.
+Egg = one container for panel users. Compose = multi-service preferred host install. Same product.

@@ -4,10 +4,10 @@
         "version": "PTDL_v2",
         "update_url": null
     },
-    "exported_at": "2026-10-24T12:22:09.623Z",
+    "exported_at": "2026-10-24T12:31:45.311Z",
     "name": "THRUM",
     "author": "mohfarzin@users.noreply.github.com",
-    "description": "THRUM heartbeat monitor — one container. Clones GitHub, builds the UI, runs embedded PostgreSQL + Redis + Gunicorn + Celery. No separate database or Redis server. Build the image once on the Wings node: docker build -t thrum-pterodactyl:latest -f pterodactyl/Dockerfile .",
+    "description": "THRUM — one container with embedded Postgres + Redis + API + Celery + UI. SECRET_KEY is auto-generated on first start (printed in console + saved to data/secret_key.txt). Build image once: docker build -t thrum-pterodactyl:latest -f pterodactyl/Dockerfile .",
     "features": null,
     "docker_images": {
         "THRUM All-in-one": "thrum-pterodactyl:latest"
@@ -22,7 +22,7 @@
     },
     "scripts": {
         "installation": {
-            "script": "#!/bin/bash\n# THRUM egg install — clone GitHub, install Python deps, build React UI.\n# Postgres + Redis run embedded at startup (no separate servers / URLs).\nset -euo pipefail\n\napt-get update\napt-get install -y --no-install-recommends git curl ca-certificates gnupg\n\ncurl -fsSL https://deb.nodesource.com/setup_22.x | bash -\napt-get install -y --no-install-recommends nodejs\n\nmkdir -p /mnt/server\ncd /mnt/server\n\nif [ \"${USER_UPLOAD:-0}\" = \"true\" ] || [ \"${USER_UPLOAD:-0}\" = \"1\" ]; then\n  echo \"USER_UPLOAD set; skipping git clone\"\n  exit 0\nfi\n\nGIT_ADDRESS=\"${GIT_ADDRESS:-https://github.com/MohFarzin/Thrum.git}\"\nif [[ \"${GIT_ADDRESS}\" != *.git ]]; then\n  GIT_ADDRESS=\"${GIT_ADDRESS}.git\"\nfi\n\nif [ -n \"${USERNAME:-}\" ] && [ -n \"${ACCESS_TOKEN:-}\" ]; then\n  GIT_ADDRESS=\"https://${USERNAME}:${ACCESS_TOKEN}@$(echo \"${GIT_ADDRESS}\" | cut -d/ -f3-)\"\nfi\n\nif [ \"$(ls -A /mnt/server)\" ]; then\n  if [ -d .git ]; then\n    echo \"Existing git repo; pulling\"\n    git pull --ff-only || true\n  else\n    echo \"/mnt/server is not empty and has no .git; refusing to overwrite\"\n    exit 10\n  fi\nelse\n  if [ -z \"${BRANCH:-}\" ]; then\n    git clone \"${GIT_ADDRESS}\" .\n  else\n    git clone --single-branch --branch \"${BRANCH}\" \"${GIT_ADDRESS}\" .\n  fi\nfi\n\nbash /mnt/server/pterodactyl/install.sh /mnt/server\n",
+            "script": "#!/bin/bash\n# THRUM egg install — clone GitHub, install Python deps, build React UI.\n# Postgres + Redis + SECRET_KEY are handled automatically at startup.\nset -euo pipefail\n\napt-get update\napt-get install -y --no-install-recommends git curl ca-certificates gnupg\n\ncurl -fsSL https://deb.nodesource.com/setup_22.x | bash -\napt-get install -y --no-install-recommends nodejs\n\nmkdir -p /mnt/server\ncd /mnt/server\n\nif [ \"${USER_UPLOAD:-0}\" = \"true\" ] || [ \"${USER_UPLOAD:-0}\" = \"1\" ]; then\n  echo \"USER_UPLOAD set; skipping git clone\"\n  exit 0\nfi\n\nGIT_ADDRESS=\"${GIT_ADDRESS:-https://github.com/MohFarzin/Thrum.git}\"\nif [[ \"${GIT_ADDRESS}\" != *.git ]]; then\n  GIT_ADDRESS=\"${GIT_ADDRESS}.git\"\nfi\n\nif [ -n \"${USERNAME:-}\" ] && [ -n \"${ACCESS_TOKEN:-}\" ]; then\n  GIT_ADDRESS=\"https://${USERNAME}:${ACCESS_TOKEN}@$(echo \"${GIT_ADDRESS}\" | cut -d/ -f3-)\"\nfi\n\nif [ \"$(ls -A /mnt/server)\" ]; then\n  if [ -d .git ]; then\n    echo \"Existing git repo; pulling\"\n    git pull --ff-only || true\n  else\n    echo \"/mnt/server is not empty and has no .git; refusing to overwrite\"\n    exit 10\n  fi\nelse\n  if [ -z \"${BRANCH:-}\" ]; then\n    git clone \"${GIT_ADDRESS}\" .\n  else\n    git clone --single-branch --branch \"${BRANCH}\" \"${GIT_ADDRESS}\" .\n  fi\nfi\n\nbash /mnt/server/pterodactyl/install.sh /mnt/server\n",
             "container": "python:3.12-bookworm",
             "entrypoint": "bash"
         }
@@ -89,18 +89,8 @@
             "field_type": "text"
         },
         {
-            "name": "Secret Key",
-            "description": "Django SECRET_KEY (required, long random string).",
-            "env_variable": "SECRET_KEY",
-            "default_value": "",
-            "user_viewable": true,
-            "user_editable": true,
-            "rules": "required|string|min:32",
-            "field_type": "text"
-        },
-        {
             "name": "Debug",
-            "description": "Django DEBUG (False in production).",
+            "description": "Django DEBUG (leave False).",
             "env_variable": "DEBUG",
             "default_value": "False",
             "user_viewable": true,
@@ -110,7 +100,7 @@
         },
         {
             "name": "Allowed Hosts",
-            "description": "Comma-separated hosts (include your panel domain / IP).",
+            "description": "Comma-separated hosts. Default * is fine for first tests.",
             "env_variable": "ALLOWED_HOSTS",
             "default_value": "*",
             "user_viewable": true,
@@ -120,7 +110,7 @@
         },
         {
             "name": "CSRF Trusted Origins",
-            "description": "Comma-separated origins, e.g. https://thrum.example.com",
+            "description": "Optional. e.g. https://thrum.example.com",
             "env_variable": "CSRF_TRUSTED_ORIGINS",
             "default_value": "",
             "user_viewable": true,
@@ -130,7 +120,7 @@
         },
         {
             "name": "Public Base URL",
-            "description": "Public URL used in alert links later.",
+            "description": "Optional until alerts. Public URL for links.",
             "env_variable": "THRUM_PUBLIC_BASE_URL",
             "default_value": "http://localhost",
             "user_viewable": true,

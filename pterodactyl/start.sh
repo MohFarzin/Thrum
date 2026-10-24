@@ -13,7 +13,14 @@ export PYTHONUNBUFFERED=1
 DATA_DIR="/home/container/data"
 PGDATA="${DATA_DIR}/postgres"
 REDIS_DIR="${DATA_DIR}/redis"
+SECRET_FILE="${DATA_DIR}/secret_key.txt"
 mkdir -p "${PGDATA}" "${REDIS_DIR}"
+
+# Auto SECRET_KEY — noob-friendly: generated on first start, saved to a file + printed once.
+export SECRET_KEY="$(
+  cd /home/container/backend
+  python -m thrum.bootstrap_secret "${SECRET_FILE}"
+)"
 
 # Locate Debian Postgres binaries (version varies by image).
 if [[ -z "${PG_BIN:-}" ]]; then
