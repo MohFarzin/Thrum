@@ -7,6 +7,15 @@ export type User = {
 export type MonitorType = 'http' | 'tcp' | 'heartbeat'
 export type MonitorStatus = 'up' | 'down' | 'unknown'
 
+export type CheckResult = {
+  id: number
+  checked_at: string
+  success: boolean
+  latency_ms: number | null
+  error_message: string
+  status_code: number | null
+}
+
 export type Monitor = {
   id: string
   name: string
@@ -26,6 +35,8 @@ export type Monitor = {
   api_key_prefix: string
   /** Present only once on create / rotate — never stored client-side permanently. */
   api_key?: string
+  /** Newest-first; used for list/dashboard bars. */
+  recent_results?: CheckResult[]
 }
 
 export type MonitorInput = {
@@ -37,15 +48,6 @@ export type MonitorInput = {
   expected_status_code: number
   heartbeat_grace_seconds: number
   is_enabled: boolean
-}
-
-export type CheckResult = {
-  id: number
-  checked_at: string
-  success: boolean
-  latency_ms: number | null
-  error_message: string
-  status_code: number | null
 }
 
 export type AlertChannelType = 'email' | 'discord'

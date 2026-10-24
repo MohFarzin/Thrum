@@ -86,7 +86,12 @@ export function Dashboard() {
                 </div>
                 <StatusPill status={m.status} />
               </div>
-              <HeartbeatBar status={m.status} />
+              <HeartbeatBar
+                status={m.status}
+                results={m.recent_results}
+                interactive={false}
+                segments={36}
+              />
               <div className="monitor-card-foot">
                 <span className="type-chip">{m.type}</span>
                 <span className="muted">

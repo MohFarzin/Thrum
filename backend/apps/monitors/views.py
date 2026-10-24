@@ -1,3 +1,4 @@
+from django.db.models import Prefetch
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
@@ -16,7 +17,12 @@ class MonitorViewSet(viewsets.ModelViewSet):
     lookup_value_regex = r"[0-9a-f-]{36}"
 
     def get_queryset(self):
-        return Monitor.objects.filter(owner=self.request.user)
+        return Monitor.objects.filter(owner=self.request.user).prefetch_related(
+            Prefetch(
+                "check_results",
+                queryset=CheckResult.objects.order_by("-checked_at"),
+            )
+        )
 
     def perform_create(self, serializer):
         serializer.save(owner=self.request.user)

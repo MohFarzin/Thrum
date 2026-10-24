@@ -41,7 +41,7 @@ export function Landing() {
           </div>
           <div className="hb-bar dense">
             {Array.from({ length: 48 }, (_, i) => (
-              <span key={i} className="hb-seg hb-up" />
+              <span key={i} className={`hb-seg ${i === 40 ? 'hb-warn' : i > 40 ? 'hb-down' : 'hb-up'}`} />
             ))}
           </div>
           <div className="preview-meta">

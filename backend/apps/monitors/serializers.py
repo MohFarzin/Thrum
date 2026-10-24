@@ -7,6 +7,7 @@ from .ssrf import assert_safe_http_url, parse_tcp_target
 
 class MonitorSerializer(serializers.ModelSerializer):
     api_key = serializers.CharField(read_only=True, required=False)
+    recent_results = serializers.SerializerMethodField()
 
     class Meta:
         model = Monitor
@@ -28,6 +29,7 @@ class MonitorSerializer(serializers.ModelSerializer):
             "updated_at",
             "api_key_prefix",
             "api_key",
+            "recent_results",
         ]
         read_only_fields = [
             "id",
@@ -39,7 +41,17 @@ class MonitorSerializer(serializers.ModelSerializer):
             "updated_at",
             "api_key_prefix",
             "api_key",
+            "recent_results",
         ]
+
+    def get_recent_results(self, obj: Monitor):
+        # Prefetched in the viewset when available.
+        cached = getattr(obj, "_prefetched_objects_cache", {}).get("check_results")
+        if cached is not None:
+            rows = list(cached)[:40]
+        else:
+            rows = list(obj.check_results.all()[:40])
+        return CheckResultSerializer(rows, many=True).data
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)

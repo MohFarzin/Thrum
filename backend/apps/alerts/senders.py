@@ -8,11 +8,14 @@ import smtplib
 import urllib.error
 import urllib.request
 from email.message import EmailMessage
+from pathlib import Path
 from typing import Protocol
 
 from django.conf import settings
 
 logger = logging.getLogger(__name__)
+
+_ASSETS = Path(__file__).resolve().parent / "assets"
 
 
 class AlertSender(Protocol):
@@ -57,6 +60,27 @@ class EmailSender:
             smtp.send_message(msg)
 
 
+def _multipart_form(fields: dict[str, str], files: list[tuple[str, str, bytes, str]]) -> tuple[bytes, str]:
+    boundary = "----ThrumBoundary7MA4YWxkTrZu0gW"
+    lines: list[bytes] = []
+    for name, value in fields.items():
+        lines.append(f"--{boundary}".encode())
+        lines.append(f'Content-Disposition: form-data; name="{name}"'.encode())
+        lines.append(b"")
+        lines.append(value.encode("utf-8"))
+    for field, filename, content, content_type in files:
+        lines.append(f"--{boundary}".encode())
+        lines.append(
+            f'Content-Disposition: form-data; name="{field}"; filename="{filename}"'.encode()
+        )
+        lines.append(f"Content-Type: {content_type}".encode())
+        lines.append(b"")
+        lines.append(content)
+    lines.append(f"--{boundary}--".encode())
+    lines.append(b"")
+    return b"\r\n".join(lines), f"multipart/form-data; boundary={boundary}"
+
+
 class DiscordSender:
     def send(self, *, subject: str, body: str, config: dict, kind: str = "down") -> None:
         url = (config.get("webhook_url") or "").strip()
@@ -65,13 +89,19 @@ class DiscordSender:
 
         base = getattr(settings, "THRUM_PUBLIC_BASE_URL", "").rstrip("/")
         down = kind == "down"
-        logo = f"{base}/{'logo-down.svg' if down else 'logo.svg'}" if base else ""
         color = 0xE85D5D if down else 0x2F9E68
+        asset_name = "logo-down.png" if down else "logo.png"
+        asset_path = _ASSETS / asset_name
+        # Prefer attached PNG (Discord rejects SVG URLs). Fallback to public PNG URL.
+        use_attach = asset_path.is_file()
+        thumb = f"attachment://{asset_name}" if use_attach else (f"{base}/{asset_name}" if base else "")
+
         author: dict = {"name": "THRUM"}
         if base:
             author["url"] = base
-        if logo:
-            author["icon_url"] = logo
+        if thumb:
+            author["icon_url"] = thumb
+
         embed: dict = {
             "author": author,
             "title": subject[:250],
@@ -79,17 +109,31 @@ class DiscordSender:
             "color": color,
             "footer": {"text": "If it has a pulse, THRUM hears it."},
         }
-        if logo:
-            embed["thumbnail"] = {"url": logo}
+        if thumb:
+            embed["thumbnail"] = {"url": thumb}
 
         payload = {"embeds": [embed]}
-        data = json.dumps(payload).encode("utf-8")
-        req = urllib.request.Request(
-            url,
-            data=data,
-            method="POST",
-            headers={"Content-Type": "application/json", "User-Agent": "THRUM-Alerts/1.0"},
-        )
+
+        if use_attach:
+            raw = asset_path.read_bytes()
+            body_bytes, content_type = _multipart_form(
+                {"payload_json": json.dumps(payload)},
+                [("files[0]", asset_name, raw, "image/png")],
+            )
+            req = urllib.request.Request(
+                url,
+                data=body_bytes,
+                method="POST",
+                headers={"Content-Type": content_type, "User-Agent": "THRUM-Alerts/1.0"},
+            )
+        else:
+            data = json.dumps(payload).encode("utf-8")
+            req = urllib.request.Request(
+                url,
+                data=data,
+                method="POST",
+                headers={"Content-Type": "application/json", "User-Agent": "THRUM-Alerts/1.0"},
+            )
         try:
             with urllib.request.urlopen(req, timeout=15) as resp:  # noqa: S310
                 resp.read(256)
