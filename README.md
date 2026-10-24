@@ -45,7 +45,7 @@ flowchart LR
 
 ## Quick start
 
-**Requirements:** Docker + Docker Compose.
+**Preferred:** Docker + Docker Compose on a host (full stack: Nginx, API, worker, beat, Postgres, Redis).
 
 ```bash
 cp .env.example .env
@@ -59,6 +59,17 @@ docker compose up --build
 - Admin: http://localhost/admin/ (create a superuser later)
 
 Low-RAM tip: Celery worker concurrency is `2` in Compose; drop to `1` on tiny hosts.
+
+### Pterodactyl egg (panel)
+
+Pterodactyl cannot run Docker Compose inside one server. Use the published egg if you want install/start/console from the panel:
+
+1. Download / import [`pterodactyl/egg-thrum.json`](./pterodactyl/egg-thrum.json) (Admin → Eggs → Import).
+2. Provide **PostgreSQL** and **Redis** (separate panel eggs or external URLs).
+3. Create a **THRUM** server; set `SECRET_KEY`, `DATABASE_URL`, `REDIS_URL`, `ALLOWED_HOSTS`.
+4. Install → Start. The egg clones [MohFarzin/Thrum](https://github.com/MohFarzin/Thrum), builds the UI, and runs Gunicorn + Celery in one container.
+
+Details: [`pterodactyl/README.md`](./pterodactyl/README.md).
 
 ## Creating monitors / Discord / heartbeat curl
 

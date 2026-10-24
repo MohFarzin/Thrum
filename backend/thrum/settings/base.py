@@ -38,6 +38,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    "whitenoise.middleware.WhiteNoiseMiddleware",
     "corsheaders.middleware.CorsMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
@@ -46,6 +47,13 @@ MIDDLEWARE = [
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
+
+# Repo root is parent of backend/ (Compose + Pterodactyl layouts).
+REPO_ROOT = BASE_DIR.parent
+_SPA_DIST = REPO_ROOT / "frontend" / "dist"
+# Egg / single-process mode: serve the built React app from Django (no Nginx).
+if _SPA_DIST.is_dir():
+    WHITENOISE_ROOT = str(_SPA_DIST)
 
 ROOT_URLCONF = "thrum.urls"
 

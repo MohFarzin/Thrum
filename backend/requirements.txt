@@ -7,3 +7,4 @@ gunicorn>=23.0,<25
 dj-database-url>=2.3,<3
 django-cors-headers>=4.6,<5
 python-dotenv>=1.0,<2
+whitenoise>=6.8,<7

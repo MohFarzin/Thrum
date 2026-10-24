@@ -25,7 +25,8 @@ frontend/dist/
 *.log
 npm-debug.log*
 
-# IDE / OS
+# IDE / OS / Cursor (local agent rules — never push)
+.cursor/
 .idea/
 .vscode/
 *.swp

@@ -1,0 +1,182 @@
+{
+    "_comment": "THRUM — https://github.com/MohFarzin/Thrum",
+    "meta": {
+        "version": "PTDL_v2",
+        "update_url": null
+    },
+    "exported_at": "2026-10-24T12:06:07.589Z",
+    "name": "THRUM",
+    "author": "mohfarzin@users.noreply.github.com",
+    "description": "THRUM self-hosted heartbeat monitor. Clones from GitHub, builds the React UI, runs Gunicorn + Celery worker/beat in one container. Requires external PostgreSQL and Redis (panel DB/Redis eggs or URLs). Preferred full stack remains Docker Compose — see README.",
+    "features": null,
+    "docker_images": {
+        "Python 3.12": "ghcr.io/parkervcp/yolks:python_3.12"
+    },
+    "file_denylist": [],
+    "startup": "bash /home/container/pterodactyl/start.sh",
+    "config": {
+        "files": "{}",
+        "startup": "{\n    \"done\": \"Listening at:\"\n}",
+        "logs": "{}",
+        "stop": "^C"
+    },
+    "scripts": {
+        "installation": {
+            "script": "#!/bin/bash\n# THRUM egg install — clone GitHub repo then build deps + frontend\nset -euo pipefail\n\napt-get update\napt-get install -y --no-install-recommends git curl ca-certificates gnupg\n\n# Node.js 22 for frontend build (install container only)\ncurl -fsSL https://deb.nodesource.com/setup_22.x | bash -\napt-get install -y --no-install-recommends nodejs\n\nmkdir -p /mnt/server\ncd /mnt/server\n\nif [ \"${USER_UPLOAD:-0}\" = \"true\" ] || [ \"${USER_UPLOAD:-0}\" = \"1\" ]; then\n  echo \"USER_UPLOAD set; skipping git clone\"\n  exit 0\nfi\n\nGIT_ADDRESS=\"${GIT_ADDRESS:-https://github.com/MohFarzin/Thrum.git}\"\nif [[ \"${GIT_ADDRESS}\" != *.git ]]; then\n  GIT_ADDRESS=\"${GIT_ADDRESS}.git\"\nfi\n\nif [ -n \"${USERNAME:-}\" ] && [ -n \"${ACCESS_TOKEN:-}\" ]; then\n  GIT_ADDRESS=\"https://${USERNAME}:${ACCESS_TOKEN}@$(echo \"${GIT_ADDRESS}\" | cut -d/ -f3-)\"\nfi\n\nif [ \"$(ls -A /mnt/server)\" ]; then\n  if [ -d .git ]; then\n    echo \"Existing git repo; pulling\"\n    git pull --ff-only || true\n  else\n    echo \"/mnt/server is not empty and has no .git; refusing to overwrite\"\n    exit 10\n  fi\nelse\n  if [ -z \"${BRANCH:-}\" ]; then\n    git clone \"${GIT_ADDRESS}\" .\n  else\n    git clone --single-branch --branch \"${BRANCH}\" \"${GIT_ADDRESS}\" .\n  fi\nfi\n\nbash /mnt/server/pterodactyl/install.sh /mnt/server\n",
+            "container": "python:3.12-bookworm",
+            "entrypoint": "bash"
+        }
+    },
+    "variables": [
+        {
+            "name": "Git Repo Address",
+            "description": "Git repo to clone (default: official THRUM).",
+            "env_variable": "GIT_ADDRESS",
+            "default_value": "https://github.com/MohFarzin/Thrum.git",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "required|string",
+            "field_type": "text"
+        },
+        {
+            "name": "Git Branch",
+            "description": "Branch to clone. Default main.",
+            "env_variable": "BRANCH",
+            "default_value": "main",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "nullable|string",
+            "field_type": "text"
+        },
+        {
+            "name": "Auto Update",
+            "description": "git pull on each start (1=yes, 0=no).",
+            "env_variable": "AUTO_UPDATE",
+            "default_value": "0",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "required|boolean",
+            "field_type": "text"
+        },
+        {
+            "name": "User Uploaded Files",
+            "description": "Skip git clone on install if you upload files yourself (1=skip).",
+            "env_variable": "USER_UPLOAD",
+            "default_value": "0",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "required|boolean",
+            "field_type": "text"
+        },
+        {
+            "name": "Git Username",
+            "description": "Optional username for private repos.",
+            "env_variable": "USERNAME",
+            "default_value": "",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "nullable|string",
+            "field_type": "text"
+        },
+        {
+            "name": "Git Access Token",
+            "description": "Optional PAT for private repos.",
+            "env_variable": "ACCESS_TOKEN",
+            "default_value": "",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "nullable|string",
+            "field_type": "text"
+        },
+        {
+            "name": "Secret Key",
+            "description": "Django SECRET_KEY (required, long random string).",
+            "env_variable": "SECRET_KEY",
+            "default_value": "",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "required|string|min:32",
+            "field_type": "text"
+        },
+        {
+            "name": "Debug",
+            "description": "Django DEBUG (False in production).",
+            "env_variable": "DEBUG",
+            "default_value": "False",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "required|string|in:True,False,true,false",
+            "field_type": "text"
+        },
+        {
+            "name": "Allowed Hosts",
+            "description": "Comma-separated hosts (include your panel domain / IP).",
+            "env_variable": "ALLOWED_HOSTS",
+            "default_value": "*",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "required|string",
+            "field_type": "text"
+        },
+        {
+            "name": "CSRF Trusted Origins",
+            "description": "Comma-separated origins, e.g. https://thrum.example.com",
+            "env_variable": "CSRF_TRUSTED_ORIGINS",
+            "default_value": "",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "nullable|string",
+            "field_type": "text"
+        },
+        {
+            "name": "Public Base URL",
+            "description": "Public URL used in alert links later.",
+            "env_variable": "THRUM_PUBLIC_BASE_URL",
+            "default_value": "http://localhost",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "required|string",
+            "field_type": "text"
+        },
+        {
+            "name": "Database URL",
+            "description": "PostgreSQL URL, e.g. postgres://user:pass@host:5432/thrum",
+            "env_variable": "DATABASE_URL",
+            "default_value": "",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "required|string",
+            "field_type": "text"
+        },
+        {
+            "name": "Redis URL",
+            "description": "Redis URL, e.g. redis://host:6379/0",
+            "env_variable": "REDIS_URL",
+            "default_value": "",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "required|string",
+            "field_type": "text"
+        },
+        {
+            "name": "Celery Concurrency",
+            "description": "Celery worker processes (1–2 on small hosts).",
+            "env_variable": "CELERY_CONCURRENCY",
+            "default_value": "1",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "required|integer|min:1|max:8",
+            "field_type": "text"
+        },
+        {
+            "name": "Gunicorn Workers",
+            "description": "Gunicorn worker count.",
+            "env_variable": "GUNICORN_WORKERS",
+            "default_value": "2",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "required|integer|min:1|max:8",
+            "field_type": "text"
+        }
+    ]
+}
