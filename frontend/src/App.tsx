@@ -1,49 +1,33 @@
-import { useEffect, useState } from 'react'
+import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
+import { Layout } from './components/Layout'
+import { AuthProvider } from './hooks/useAuth'
+import { Dashboard } from './pages/Dashboard'
+import { Landing } from './pages/Landing'
+import { Login } from './pages/Login'
+import { MonitorDetail } from './pages/MonitorDetail'
+import { MonitorForm } from './pages/MonitorForm'
+import { MonitorsList } from './pages/MonitorsList'
+import { Register } from './pages/Register'
 import './App.css'
 
-type HealthState = 'loading' | 'ok' | 'error'
-
-function App() {
-  const [health, setHealth] = useState<HealthState>('loading')
-
-  useEffect(() => {
-    let cancelled = false
-    fetch('/api/health/')
-      .then((res) => {
-        if (!res.ok) throw new Error('bad status')
-        return res.json()
-      })
-      .then(() => {
-        if (!cancelled) setHealth('ok')
-      })
-      .catch(() => {
-        if (!cancelled) setHealth('error')
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [])
-
-  const label =
-    health === 'loading'
-      ? 'Checking API…'
-      : health === 'ok'
-        ? 'API healthy'
-        : 'API unreachable (start Compose)'
-
+export default function App() {
   return (
-    <main className="shell">
-      <div className="panel">
-        <h1 className="brand">THRUM</h1>
-        <p className="tagline">If it has a pulse, THRUM hears it.</p>
-        <div className="status">
-          <span className={`dot ${health === 'ok' ? 'ok' : health === 'error' ? 'err' : ''}`} />
-          <span>{label}</span>
-        </div>
-        <p className="meta">Phase 0 skeleton — monitors and alerts come next.</p>
-      </div>
-    </main>
+    <AuthProvider>
+      <BrowserRouter>
+        <Routes>
+          <Route element={<Layout />}>
+            <Route index element={<Landing />} />
+            <Route path="login" element={<Login />} />
+            <Route path="register" element={<Register />} />
+            <Route path="dashboard" element={<Dashboard />} />
+            <Route path="monitors" element={<MonitorsList />} />
+            <Route path="monitors/new" element={<MonitorForm />} />
+            <Route path="monitors/:id" element={<MonitorDetail />} />
+            <Route path="monitors/:id/edit" element={<MonitorForm />} />
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Route>
+        </Routes>
+      </BrowserRouter>
+    </AuthProvider>
   )
 }
-
-export default App

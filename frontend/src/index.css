@@ -5,6 +5,8 @@
   --text-h: #f2f7f4;
   --accent: #3dba7a;
   --muted: #7a9186;
+  --danger: #d65a5a;
+  --line: #24352c;
   --sans: "Segoe UI", "Helvetica Neue", sans-serif;
   --display: "Trebuchet MS", "Segoe UI", sans-serif;
 }
@@ -23,10 +25,17 @@ body {
     linear-gradient(160deg, var(--bg0), var(--bg1) 60%, #0a100e);
 }
 
-#root {
-  min-height: 100svh;
-}
-
 a {
   color: var(--accent);
+}
+
+h1 {
+  font-family: var(--display);
+  color: var(--text-h);
+  margin: 0 0 0.75rem;
+}
+
+code {
+  font-size: 0.9em;
+  word-break: break-all;
 }

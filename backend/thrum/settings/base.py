@@ -117,6 +117,9 @@ REST_FRAMEWORK = {
 
 # Auth choice (locked for UI): Django session + DRF SessionAuthentication.
 # SPA will use same-origin cookies via the reverse proxy.
+CSRF_COOKIE_HTTPONLY = False  # SPA reads csrftoken for X-CSRFToken header
+SESSION_COOKIE_SAMESITE = "Lax"
+CSRF_COOKIE_SAMESITE = "Lax"
 
 CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOWED_ORIGINS = CSRF_TRUSTED_ORIGINS

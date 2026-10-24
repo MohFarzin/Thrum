@@ -4,7 +4,7 @@
 
 Open-source, self-hosted tech heartbeat monitoring — web UI, ingest API, and alerts.
 
-> Phase 0 skeleton: the **server** boots as an all-in-one box. Monitors, alerts, and **client agents** come in later phases.
+> Phase 1: register/login, create/edit monitors (HTTP/TCP/heartbeat). Live checks = Phase 2. Client agents = Phase 3+.
 
 ## All-in-one box — just works
 
