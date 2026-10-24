@@ -1,5 +1,12 @@
 #!/bin/bash
 # All-in-one start: embedded Postgres + Redis + Celery + Gunicorn.
+# Re-exec without CRLF if the volume file was edited on Windows.
+if grep -q $'\r' "$0" 2>/dev/null; then
+  _lf="${0}.lf"
+  tr -d '\r' <"$0" >"${_lf}"
+  chmod +x "${_lf}"
+  exec bash "${_lf}" "$@"
+fi
 set -euo pipefail
 
 banner() {
@@ -51,15 +58,61 @@ export PATH="${PG_BIN}:${PATH}"
 export DATABASE_URL="${DATABASE_URL:-postgres://thrum@127.0.0.1:5432/thrum}"
 export REDIS_URL="${REDIS_URL:-redis://127.0.0.1:6379/0}"
 
-if [[ -d .git ]] && [[ "${AUTO_UPDATE:-0}" == "1" ]]; then
+if [[ -d .git ]] && [[ "${AUTO_UPDATE:-0}" == "1" ]] && [[ "${THRUM_UPDATED:-0}" != "1" ]]; then
   step "Updating from git"
-  git pull --ff-only && ok "up to date" || warn "git pull skipped"
+  BRANCH="${BRANCH:-$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo main)}"
+  # Egg volumes get dirty from hotfixes — reset to origin, keep data + built UI, then re-exec.
+  if git fetch origin "${BRANCH}" \
+    && git clean -fd -e data -e frontend/dist -e .local \
+    && git reset --hard "origin/${BRANCH}"; then
+    ok "synced to origin/${BRANCH} — restarting start.sh"
+    export THRUM_UPDATED=1
+    exec bash /home/container/pterodactyl/start.sh
+  else
+    warn "git update skipped"
+  fi
 fi
 
 if [[ ! -d frontend/dist ]]; then
   warn "frontend/dist missing — Reinstall the server from the panel"
   exit 1
 fi
+
+# Stale locks after kill/restart (PID may now belong to redis/etc.)
+clear_stale_pg_lock() {
+  local pidfile="${PGDATA}/postmaster.pid"
+  local socklock="${DATA_DIR}/.s.PGSQL.5432.lock"
+  local sock="${DATA_DIR}/.s.PGSQL.5432"
+
+  if [[ -f "${pidfile}" ]]; then
+    local oldpid
+    oldpid="$(head -1 "${pidfile}" 2>/dev/null || true)"
+    if [[ -n "${oldpid}" ]] && kill -0 "${oldpid}" 2>/dev/null; then
+      if [[ -r "/proc/${oldpid}/cmdline" ]] && tr '\0' ' ' <"/proc/${oldpid}/cmdline" | grep -q postgres; then
+        step "Stopping leftover Postgres (pid ${oldpid})"
+        pg_ctl -D "${PGDATA}" -m fast stop >/dev/null 2>&1 || kill "${oldpid}" 2>/dev/null || true
+        sleep 1
+      else
+        warn "stale Postgres pid lock — clearing"
+        rm -f "${pidfile}"
+      fi
+    else
+      warn "stale Postgres pid lock — clearing"
+      rm -f "${pidfile}"
+    fi
+  fi
+
+  # Socket lock left after hard kill
+  if [[ -f "${socklock}" ]]; then
+    local spid
+    spid="$(head -1 "${socklock}" 2>/dev/null || true)"
+    if [[ -z "${spid}" ]] || ! kill -0 "${spid}" 2>/dev/null \
+      || ! { [[ -r "/proc/${spid}/cmdline" ]] && tr '\0' ' ' <"/proc/${spid}/cmdline" | grep -q postgres; }; then
+      warn "stale Postgres socket lock — clearing"
+      rm -f "${socklock}" "${sock}"
+    fi
+  fi
+}
 
 PG_PID=""
 REDIS_PID=""
@@ -82,7 +135,8 @@ redis-server \
   --dir "${REDIS_DIR}" \
   --daemonize no \
   --save "" \
-  --appendonly no &
+  --appendonly no \
+  --loglevel warning &
 REDIS_PID=$!
 sleep 1
 ok "listening on 127.0.0.1:6379"
@@ -97,6 +151,8 @@ if [[ ! -f "${PGDATA}/PG_VERSION" ]]; then
     echo "unix_socket_directories = '${DATA_DIR}'"
   } >> "${PGDATA}/postgresql.conf"
 fi
+
+clear_stale_pg_lock
 
 postgres -D "${PGDATA}" -h 127.0.0.1 -p 5432 -k "${DATA_DIR}" &
 PG_PID=$!

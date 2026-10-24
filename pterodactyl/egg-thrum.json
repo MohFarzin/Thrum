@@ -51,7 +51,7 @@
         },
         {
             "name": "Auto Update",
-            "description": "git pull on each start (1=yes, 0=no).",
+            "description": "On start: fetch + hard-reset to origin/BRANCH (keeps data/ and frontend/dist). Local file edits are discarded. 1=yes, 0=no.",
             "env_variable": "AUTO_UPDATE",
             "default_value": "0",
             "user_viewable": true,
