@@ -20,7 +20,7 @@ export function Dashboard() {
         .then(setMonitors)
         .catch((err) => setError(err instanceof Error ? err.message : 'Failed to load'))
     void load()
-    const t = window.setInterval(() => void load(), 15000)
+    const t = window.setInterval(() => void load(), 30000)
     return () => window.clearInterval(t)
   }, [user])
 

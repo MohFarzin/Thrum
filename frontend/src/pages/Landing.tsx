@@ -46,7 +46,7 @@ export function Landing() {
         .then(setMonitors)
         .catch(() => setMonitors([]))
     void load()
-    const t = window.setInterval(() => void load(), 20000)
+    const t = window.setInterval(() => void load(), 30000)
     return () => window.clearInterval(t)
   }, [user])
 

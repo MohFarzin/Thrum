@@ -198,10 +198,11 @@ echo "  ------------------------------------------"
 echo "  Tip: use http:// (not https) on the allocation port."
 echo ""
 
+THREADS="${GUNICORN_THREADS:-1}"
 exec gunicorn thrum.wsgi:application \
   --bind "0.0.0.0:${PORT}" \
   --workers "${WORKERS}" \
-  --threads 2 \
+  --threads "${THREADS}" \
   --timeout "${TIMEOUT}" \
   --graceful-timeout 30 \
   --access-logfile - \

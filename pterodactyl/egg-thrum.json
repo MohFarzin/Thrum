@@ -141,9 +141,9 @@
         },
         {
             "name": "Gunicorn Workers",
-            "description": "Gunicorn worker count.",
+            "description": "Gunicorn worker processes. Use 1 on small/shared hosts.",
             "env_variable": "GUNICORN_WORKERS",
-            "default_value": "2",
+            "default_value": "1",
             "user_viewable": true,
             "user_editable": true,
             "rules": "required|integer|min:1|max:8",

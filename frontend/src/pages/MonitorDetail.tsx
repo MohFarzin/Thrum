@@ -66,7 +66,7 @@ export function MonitorDetail() {
     load().catch((err) => setError(err instanceof Error ? err.message : 'Failed to load'))
     const t = window.setInterval(() => {
       void load().catch(() => {})
-    }, 15000)
+    }, 30000)
     return () => window.clearInterval(t)
   }, [user, id, load])
 

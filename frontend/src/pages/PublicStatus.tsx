@@ -37,7 +37,7 @@ export function PublicStatus() {
         .then(setData)
         .catch((err) => setError(err instanceof Error ? err.message : 'Failed'))
     void load()
-    const t = window.setInterval(() => void load(), 20000)
+    const t = window.setInterval(() => void load(), 30000)
     return () => window.clearInterval(t)
   }, [slug])
 

@@ -1,3 +1,5 @@
+from datetime import timedelta
+
 from django.db.models import Prefetch
 from django.utils import timezone
 from rest_framework import status, viewsets
@@ -12,6 +14,9 @@ from .serializers import CheckResultSerializer, MonitorSerializer
 from .services import run_monitor_check
 
 MAX_FAVORITES = 6
+# List/dashboard bars only need ~1h of history — never prefetch the full retention window.
+LIST_RESULTS_WINDOW = timedelta(hours=1)
+LIST_RESULTS_CAP = 60
 
 
 class MonitorViewSet(viewsets.ModelViewSet):
@@ -21,12 +26,27 @@ class MonitorViewSet(viewsets.ModelViewSet):
     lookup_value_regex = r"[0-9a-f-]{36}"
 
     def get_queryset(self):
-        return Monitor.objects.filter(owner=self.request.user).prefetch_related(
-            Prefetch(
-                "check_results",
-                queryset=CheckResult.objects.order_by("-checked_at"),
+        qs = Monitor.objects.filter(owner=self.request.user)
+        # Detail/update don't need embedded recent_results; list/retrieve do for bars.
+        if self.action in ("list", "retrieve"):
+            since = timezone.now() - LIST_RESULTS_WINDOW
+            qs = qs.prefetch_related(
+                Prefetch(
+                    "check_results",
+                    queryset=CheckResult.objects.filter(checked_at__gte=since)
+                    .order_by("-checked_at")
+                    .only(
+                        "id",
+                        "monitor_id",
+                        "checked_at",
+                        "success",
+                        "latency_ms",
+                        "error_message",
+                        "status_code",
+                    ),
+                )
             )
-        )
+        return qs
 
     def perform_create(self, serializer):
         serializer.save(owner=self.request.user)

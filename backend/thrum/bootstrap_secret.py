@@ -31,10 +31,10 @@ def ensure_secret_key(path: Path) -> str:
     key = secrets.token_urlsafe(50)
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(key + "\n", encoding="utf-8")
+    # Do not print the key — shared console logs would leak it.
     print("==> THRUM generated a SECRET_KEY for you", file=sys.stderr)
-    print(f"    File:  {path}", file=sys.stderr)
-    print(f"    Value: {key}", file=sys.stderr)
-    print("    Re-read anytime from that file (or scroll the console on first start).", file=sys.stderr)
+    print(f"    Saved to: {path}", file=sys.stderr)
+    print("    Read it from that file (not logged again).", file=sys.stderr)
     return key
 
 

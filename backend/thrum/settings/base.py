@@ -53,8 +53,8 @@ _SPA_DIST = REPO_ROOT / "frontend" / "dist"
 if _SPA_DIST.is_dir():
     WHITENOISE_ROOT = str(_SPA_DIST)
     WHITENOISE_INDEX_FILE = True
-    # Autorefresh so hot-patched dist hashes match SpaIndexView (avoids black-screen refresh).
-    WHITENOISE_AUTOREFRESH = os.environ.get("WHITENOISE_AUTOREFRESH", "1").lower() in (
+    # Off by default (CPU). Set WHITENOISE_AUTOREFRESH=1 while hot-patching dist without restart.
+    WHITENOISE_AUTOREFRESH = os.environ.get("WHITENOISE_AUTOREFRESH", "0").lower() in (
         "1",
         "true",
         "yes",

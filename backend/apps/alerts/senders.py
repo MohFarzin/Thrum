@@ -10,12 +10,21 @@ import urllib.request
 from email.message import EmailMessage
 from pathlib import Path
 from typing import Protocol
+from urllib.parse import urlparse
 
 from django.conf import settings
 
 logger = logging.getLogger(__name__)
 
 _ASSETS = Path(__file__).resolve().parent / "assets"
+_DISCORD_HOSTS = ("discord.com", "discordapp.com")
+
+
+def _discord_url_ok(url: str) -> bool:
+    host = (urlparse(url).hostname or "").lower()
+    if host in _DISCORD_HOSTS:
+        return True
+    return any(host.endswith(f".{h}") for h in _DISCORD_HOSTS)
 
 
 class AlertSender(Protocol):
@@ -84,8 +93,8 @@ def _multipart_form(fields: dict[str, str], files: list[tuple[str, str, bytes, s
 class DiscordSender:
     def send(self, *, subject: str, body: str, config: dict, kind: str = "down") -> None:
         url = (config.get("webhook_url") or "").strip()
-        if not url.startswith("https://"):
-            raise ValueError("Discord channel needs https webhook_url")
+        if not url.startswith("https://") or not _discord_url_ok(url):
+            raise ValueError("Discord channel needs an https discord.com webhook_url")
 
         base = getattr(settings, "THRUM_PUBLIC_BASE_URL", "").rstrip("/")
         down = kind == "down"
