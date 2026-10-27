@@ -53,16 +53,15 @@ class MonitorSerializer(serializers.ModelSerializer):
         ]
 
     def get_recent_results(self, obj: Monitor):
-        # List/dashboard bars only need time + success — skip fat fields (error/latency/code).
+        # List/dashboard: interval-aligned 1h bar (carry-fill), not raw sparse points.
+        from .bar import time_buckets
+
         cached = getattr(obj, "_prefetched_objects_cache", {}).get("check_results")
         if cached is not None:
-            rows = list(cached)[:60]
+            rows = list(cached)
         else:
-            rows = list(obj.check_results.all()[:60])
-        return [
-            {"id": str(r.id), "checked_at": r.checked_at.isoformat().replace("+00:00", "Z"), "success": r.success}
-            for r in rows
-        ]
+            rows = list(obj.check_results.all()[:120])
+        return time_buckets(obj, "1h", rows=rows)
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)

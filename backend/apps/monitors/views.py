@@ -72,14 +72,14 @@ class MonitorViewSet(viewsets.ModelViewSet):
         want_bar = request.query_params.get("bar") in ("1", "true", "yes")
         buckets_raw = request.query_params.get("buckets")
 
-        # Time-aligned bar: ?range=10m&bar=1  (or &buckets=N)
+        # Time-aligned bar: ?range=10m&bar=1  (or &buckets=N). Omit buckets → interval-sized.
         if range_key in DEFAULT_BUCKETS and (want_bar or buckets_raw is not None):
-            try:
-                buckets = int(buckets_raw) if buckets_raw not in (None, "") else 0
-            except ValueError:
-                buckets = 0
-            if buckets <= 0:
-                buckets = DEFAULT_BUCKETS[range_key]
+            buckets = None
+            if buckets_raw not in (None, ""):
+                try:
+                    buckets = max(12, min(int(buckets_raw), 120))
+                except ValueError:
+                    buckets = None
             return Response(time_buckets(monitor, range_key, buckets))
 
         qs = CheckResult.objects.filter(monitor=monitor).order_by("-checked_at")
