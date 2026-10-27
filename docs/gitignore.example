@@ -1,9 +1,24 @@
-# Env / secrets
+# Copy to repo root as `.gitignore` (that file stays local — not pushed).
+# Env / secrets — never push these
 .env
-.env.local
+.env.*
+!.env.example
+.envrc
 *.pem
-data/
+*.ppk
+*.p12
+*.pfx
+id_rsa*
+id_ed25519*
+credentials.json
 **/secret_key.txt
+data/
+.secrets/
+local-notes*
+*.local.md
+
+# Keep the live ignore file off GitHub
+.gitignore
 
 # Python
 __pycache__/
@@ -15,7 +30,6 @@ dist/
 build/
 .venv/
 venv/
-.envrc
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
@@ -30,7 +44,7 @@ npm-debug.log*
 # Local-only build brief (agents use it; never publish)
 thrum-plan.txt
 
-# IDE / OS / Cursor (local agent rules — never push)
+# IDE / OS / Cursor (local agent canon — never push)
 .cursor/
 .idea/
 .vscode/
@@ -38,17 +52,15 @@ thrum-plan.txt
 .DS_Store
 Thumbs.db
 
-# Docker
+# Docker / panel scratch
 docker-data/
-
-# Local scratch for egg image builds / embedded data
 pterodactyl-data/
 
 # Agent hotpatch / temp bundles (never commit)
 _hp*/
-_hotpatch*
-_*.tgz
-_*.py
+_hotpatch*/
+/_*.tgz
+/_*.py
 
 # Coverage
 htmlcov/
