@@ -20,6 +20,7 @@ export function Layout() {
               <NavLink to="/dashboard">Dashboard</NavLink>
               <NavLink to="/monitors">Monitors</NavLink>
               <NavLink to="/alerts">Alerts</NavLink>
+              <NavLink to="/logs">Logs</NavLink>
               <span className="nav-user">{user.username}</span>
               <button type="button" className="btn ghost tiny" onClick={() => void logout()}>
                 Log out

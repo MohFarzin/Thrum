@@ -61,6 +61,19 @@ def apply_probe(monitor: Monitor, probe: ProbeResult) -> CheckResult:
                 "updated_at",
             ]
         )
+        if old_status != monitor.status:
+            try:
+                from apps.accounts.audit import log_audit
+                from apps.accounts.models import AuditEvent
+
+                log_audit(
+                    monitor.owner,
+                    AuditEvent.Kind.STATUS_CHANGE,
+                    f"{monitor.name}: {old_status} → {monitor.status}",
+                    monitor_id=monitor.id,
+                )
+            except Exception:  # noqa: BLE001 — never fail a check on audit
+                pass
         maybe_dispatch_transition(monitor, old_status, monitor.status)
         return result
 
@@ -72,10 +85,11 @@ def run_monitor_check(monitor_id) -> CheckResult | None:
         return None
     if not monitor.is_enabled:
         return None
-    if monitor.type not in (Monitor.Type.HTTP, Monitor.Type.TCP):
+    if monitor.type not in (Monitor.Type.HTTP, Monitor.Type.TCP, Monitor.Type.UDP):
         return None
     probe = probe_monitor(monitor)
-    return apply_probe(monitor, probe)
+    result = apply_probe(monitor, probe)
+    return result
 
 
 def record_heartbeat(monitor: Monitor, message: str = "") -> Monitor:

@@ -3,6 +3,7 @@ import { Layout } from './components/Layout'
 import { AuthProvider } from './hooks/useAuth'
 import { ThemeProvider } from './hooks/useTheme'
 import { AlertChannels } from './pages/AlertChannels'
+import { AuditLogs } from './pages/AuditLogs'
 import { Dashboard } from './pages/Dashboard'
 import { Landing } from './pages/Landing'
 import { Login } from './pages/Login'
@@ -31,6 +32,7 @@ export default function App() {
               <Route path="monitors/:id" element={<MonitorDetail />} />
               <Route path="monitors/:id/edit" element={<MonitorForm />} />
               <Route path="alerts" element={<AlertChannels />} />
+              <Route path="logs" element={<AuditLogs />} />
               <Route path="s/:slug" element={<PublicStatus />} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Route>

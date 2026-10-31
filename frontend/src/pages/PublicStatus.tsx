@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import type { BarSegment, MonitorStatus, UptimeSummary } from '../api/types'
+import type { BarSegment, HealthSlice, Incident, MonitorStatus, UptimeSummary } from '../api/types'
 import { BrandMark } from '../components/BrandMark'
 import { HeartbeatBar } from '../components/HeartbeatBar'
 import { StatusPill } from '../components/StatusPill'
+import { UptimePie } from '../components/UptimePie'
 
 type PublicPayload = {
   name: string
@@ -14,22 +15,41 @@ type PublicPayload = {
   range: string
   bar: BarSegment[]
   uptime: UptimeSummary
+  health: HealthSlice
+  incidents: Incident[]
+  visibility: string
 }
+
+const RANGES = [
+  { id: '1h', label: '1h' },
+  { id: '1d', label: '24h' },
+  { id: '7d', label: '7d' },
+  { id: '30d', label: '30d' },
+] as const
 
 function fmtPct(v: number | null | undefined) {
   if (v == null) return '—'
   return `${v}%`
 }
 
+function fmtTime(iso: string) {
+  try {
+    return new Date(iso).toLocaleString()
+  } catch {
+    return iso
+  }
+}
+
 export function PublicStatus() {
   const { slug } = useParams()
+  const [range, setRange] = useState<(typeof RANGES)[number]['id']>('1d')
   const [data, setData] = useState<PublicPayload | null>(null)
   const [error, setError] = useState('')
 
   useEffect(() => {
     if (!slug) return
     const load = () =>
-      fetch(`/api/public/status/${slug}/?range=1h`, { credentials: 'omit' })
+      fetch(`/api/public/status/${slug}/?range=${range}`, { credentials: 'omit' })
         .then(async (res) => {
           if (!res.ok) throw new Error(res.status === 404 ? 'Not found or sharing off' : 'Failed')
           return res.json() as Promise<PublicPayload>
@@ -39,7 +59,7 @@ export function PublicStatus() {
     void load()
     const t = window.setInterval(() => void load(), 30000)
     return () => window.clearInterval(t)
-  }, [slug])
+  }, [slug, range])
 
   if (error) {
     return (
@@ -66,6 +86,28 @@ export function PublicStatus() {
         </div>
         <StatusPill status={data.status} />
       </div>
+
+      <div className="log-banner public">Public page · no login · target host hidden</div>
+
+      <div className="range-tabs" role="tablist" aria-label="Status range">
+        {RANGES.map((r) => (
+          <button
+            key={r.id}
+            type="button"
+            role="tab"
+            aria-selected={range === r.id}
+            className={`range-tab${range === r.id ? ' on' : ''}`}
+            onClick={() => setRange(r.id)}
+          >
+            {r.label}
+          </button>
+        ))}
+      </div>
+
+      <div className="health-hero public-health">
+        <UptimePie health={data.health} size={200} label={`Uptime · ${range}`} />
+      </div>
+
       <div className="uptime-row">
         <span>
           <em>10m</em> {fmtPct(data.uptime['10m'])}
@@ -83,11 +125,31 @@ export function PublicStatus() {
           <em>30d</em> {fmtPct(data.uptime['30d'])}
         </span>
       </div>
+
       <div className="detail-panel">
-        <p className="meta">Last hour</p>
+        <p className="meta">History · {range}</p>
         <HeartbeatBar status={data.status} results={data.bar} interactive={false} />
       </div>
-      <p className="meta foot-note">Shared status page · refreshes every 20s</p>
+
+      <div className="detail-panel">
+        <h2>Recent incidents</h2>
+        <p className="meta">Downtime windows visible on this public page.</p>
+        {(data.incidents || []).length === 0 ? (
+          <p className="meta empty-inline">No incidents in this range.</p>
+        ) : (
+          <ul className="incident-list">
+            {data.incidents.map((inc, i) => (
+              <li key={`${inc.started_at}-${i}`}>
+                <time dateTime={inc.started_at}>{fmtTime(inc.started_at)}</time>
+                <span className="incident-dur">{inc.duration_human}</span>
+                <span className="incident-err">{inc.error_message || 'down'}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+
+      <p className="meta foot-note">Shared status · refreshes every 30s · last check {data.last_checked_at ? fmtTime(data.last_checked_at) : '—'}</p>
     </section>
   )
 }

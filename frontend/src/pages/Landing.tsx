@@ -17,6 +17,7 @@ const DUMMY: Array<{
 }> = [
   { name: 'api', target: 'api.example.com', status: 'up', type: 'http', downFrom: 40 },
   { name: 'game-node', target: 'game-node:25565', status: 'down', type: 'tcp', downFrom: 36 },
+  { name: 'dns-edge', target: 'dns.example.com:53', status: 'up', type: 'udp', downFrom: 44 },
 ]
 
 function pickLandingMonitors(all: Monitor[]): Monitor[] {
@@ -79,8 +80,8 @@ export function Landing() {
         </div>
         <p className="tagline">If it has a pulse, THRUM hears it.</p>
         <p className="lede">
-          Self-hosted uptime for HTTP, TCP, and agent heartbeats — status you can read at a
-          glance, alerts when the beat skips.
+          Self-hosted uptime for HTTP, TCP, UDP, and agent heartbeats — status you can read at
+          a glance, alerts when the beat skips.
         </p>
         <div className="actions">
           {user ? (

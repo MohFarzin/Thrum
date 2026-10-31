@@ -12,7 +12,12 @@ const empty: MonitorInput = {
   timeout_seconds: 10,
   expected_status_code: 200,
   heartbeat_grace_seconds: 120,
+  udp_payload: '',
   is_enabled: true,
+}
+
+function intervalFloor(type: MonitorType) {
+  return type === 'tcp' || type === 'udp' ? 60 : 10
 }
 
 export function MonitorForm() {
@@ -36,13 +41,14 @@ export function MonitorForm() {
           timeout_seconds: m.timeout_seconds,
           expected_status_code: m.expected_status_code,
           heartbeat_grace_seconds: m.heartbeat_grace_seconds,
+          udp_payload: m.udp_payload || '',
           is_enabled: m.is_enabled,
         }),
       )
       .catch((err) => setError(err instanceof Error ? err.message : 'Failed to load'))
   }, [user, id])
 
-  if (loading) return <p>Loading…</p>
+  if (loading) return <p className="meta">Loading…</p>
   if (!user) return <Navigate to="/login" replace />
 
   function set<K extends keyof MonitorInput>(key: K, value: MonitorInput[K]) {
@@ -57,6 +63,7 @@ export function MonitorForm() {
       const body = {
         ...form,
         target: form.type === 'heartbeat' ? form.target : form.target.trim(),
+        interval_seconds: Math.max(intervalFloor(form.type), form.interval_seconds),
       }
       if (editing && id) {
         await api(`/api/monitors/${id}/`, {
@@ -79,6 +86,8 @@ export function MonitorForm() {
       setBusy(false)
     }
   }
+
+  const minInterval = intervalFloor(form.type)
 
   return (
     <section className="form-panel wide page">
@@ -104,7 +113,7 @@ export function MonitorForm() {
                     heartbeat_grace_seconds: Math.max(prev.heartbeat_grace_seconds, 60),
                   }
                 }
-                if (next === 'tcp') {
+                if (next === 'tcp' || next === 'udp') {
                   return {
                     ...prev,
                     type: next,
@@ -117,6 +126,7 @@ export function MonitorForm() {
           >
             <option value="http">HTTP</option>
             <option value="tcp">TCP</option>
+            <option value="udp">UDP</option>
             <option value="heartbeat">Heartbeat</option>
           </select>
         </label>
@@ -128,24 +138,38 @@ export function MonitorForm() {
             placeholder={
               form.type === 'http'
                 ? 'https://example.com'
-                : form.type === 'tcp'
+                : form.type === 'tcp' || form.type === 'udp'
                   ? 'example.com:443'
                   : ''
             }
             required={form.type !== 'heartbeat'}
           />
         </label>
+        {form.type === 'udp' ? (
+          <label>
+            UDP payload (optional)
+            <input
+              value={form.udp_payload}
+              onChange={(e) => set('udp_payload', e.target.value)}
+              placeholder="Leave empty for a short probe packet"
+              maxLength={512}
+            />
+            <span className="meta">
+              THRUM sends one datagram and marks up only if a reply arrives before timeout.
+            </span>
+          </label>
+        ) : null}
         <div className="grid-2">
           <label>
             Interval (seconds)
             <input
               type="number"
-              min={form.type === 'tcp' ? 60 : 10}
+              min={minInterval}
               value={form.interval_seconds}
               onChange={(e) => set('interval_seconds', Number(e.target.value))}
             />
-            {form.type === 'tcp' ? (
-              <span className="meta">TCP minimum is 60s (keeps small hosts quiet).</span>
+            {form.type === 'tcp' || form.type === 'udp' ? (
+              <span className="meta">Minimum 60s for TCP/UDP on small hosts.</span>
             ) : null}
           </label>
           <label>
@@ -181,7 +205,7 @@ export function MonitorForm() {
             </label>
             <p className="meta">
               Agents must POST at least every {form.interval_seconds + form.heartbeat_grace_seconds}s
-              (interval + grace). One curl does not stay online forever — use a loop or Task Scheduler.
+              (interval + grace).
             </p>
           </>
         ) : null}

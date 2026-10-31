@@ -7,7 +7,14 @@ from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 
-from .bar import DEFAULT_BUCKETS, RANGE_DELTAS, time_buckets, uptime_summary
+from .bar import (
+    DEFAULT_BUCKETS,
+    RANGE_DELTAS,
+    health_slice,
+    incident_log,
+    time_buckets,
+    uptime_summary,
+)
 from .keys import assign_new_key
 from .models import CheckResult, Monitor
 from .serializers import CheckResultSerializer, MonitorSerializer
@@ -41,7 +48,80 @@ class MonitorViewSet(viewsets.ModelViewSet):
         return qs
 
     def perform_create(self, serializer):
-        serializer.save(owner=self.request.user)
+        monitor = serializer.save(owner=self.request.user)
+        try:
+            from apps.accounts.audit import log_audit
+            from apps.accounts.models import AuditEvent
+
+            log_audit(
+                self.request.user,
+                AuditEvent.Kind.MONITOR_CREATE,
+                f"Created {monitor.type} monitor “{monitor.name}”",
+                monitor_id=monitor.id,
+            )
+        except Exception:  # noqa: BLE001
+            pass
+
+    def perform_update(self, serializer):
+        monitor = serializer.save()
+        try:
+            from apps.accounts.audit import log_audit
+            from apps.accounts.models import AuditEvent
+
+            log_audit(
+                self.request.user,
+                AuditEvent.Kind.MONITOR_UPDATE,
+                f"Updated monitor “{monitor.name}”",
+                monitor_id=monitor.id,
+            )
+        except Exception:  # noqa: BLE001
+            pass
+
+    def perform_destroy(self, instance):
+        name, mid = instance.name, instance.id
+        instance.delete()
+        try:
+            from apps.accounts.audit import log_audit
+            from apps.accounts.models import AuditEvent
+
+            log_audit(
+                self.request.user,
+                AuditEvent.Kind.MONITOR_DELETE,
+                f"Deleted monitor “{name}”",
+                monitor_id=mid,
+            )
+        except Exception:  # noqa: BLE001
+            pass
+
+    @action(detail=False, methods=["get"], url_path="fleet-health")
+    def fleet_health(self, request):
+        """Aggregate up/down check ratio across the owner's monitors."""
+        from .bar import format_duration
+
+        range_key = (request.query_params.get("range") or "1d").strip().lower()
+        if range_key not in DEFAULT_BUCKETS:
+            range_key = "1d"
+        delta = RANGE_DELTAS[range_key]
+        since = timezone.now() - delta
+        ids = list(
+            Monitor.objects.filter(owner=request.user).values_list("id", flat=True)[:500]
+        )
+        qs = CheckResult.objects.filter(monitor_id__in=ids, checked_at__gte=since)
+        up_count = qs.filter(success=True).count()
+        down_count = qs.filter(success=False).count()
+        total = up_count + down_count
+        # Rough downtime: failed checks × median interval (60s floor) — honest enough for fleet glance.
+        down_seconds = down_count * 60
+        return Response(
+            {
+                "range": range_key,
+                "uptime_pct": round(100.0 * up_count / total, 1) if total else None,
+                "up_count": up_count,
+                "down_count": down_count,
+                "down_seconds": down_seconds,
+                "down_human": format_duration(down_seconds) if total else "—",
+            }
+        )
 
     @action(detail=True, methods=["post"], url_path="favorite")
     def favorite(self, request, id=None):
@@ -94,18 +174,52 @@ class MonitorViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=["get"], url_path="uptime")
     def uptime(self, request, id=None):
         monitor = self.get_object()
-        return Response(uptime_summary(monitor))
+        range_key = (request.query_params.get("range") or "1d").strip().lower()
+        if range_key not in DEFAULT_BUCKETS:
+            range_key = "1d"
+        return Response(
+            {
+                "summary": uptime_summary(monitor),
+                "health": health_slice(monitor, range_key),
+            }
+        )
+
+    @action(detail=True, methods=["get"], url_path="incidents")
+    def incidents(self, request, id=None):
+        monitor = self.get_object()
+        range_key = (request.query_params.get("range") or "7d").strip().lower()
+        if range_key not in DEFAULT_BUCKETS:
+            range_key = "7d"
+        return Response(
+            {
+                "range": range_key,
+                "incidents": incident_log(monitor, range_key),
+                "health": health_slice(monitor, range_key),
+            }
+        )
 
     @action(detail=True, methods=["post"], url_path="share")
     def share(self, request, id=None):
         """Enable / disable public status page, or rotate the share slug."""
         import secrets
 
+        from apps.accounts.audit import log_audit
+        from apps.accounts.models import AuditEvent
+
         monitor = self.get_object()
         if request.data.get("rotate_slug"):
             monitor.public_slug = secrets.token_urlsafe(9)
             monitor.is_public = True
             monitor.save(update_fields=["is_public", "public_slug", "updated_at"])
+            try:
+                log_audit(
+                    request.user,
+                    AuditEvent.Kind.SHARE_ON,
+                    f"Rotated share link for “{monitor.name}”",
+                    monitor_id=monitor.id,
+                )
+            except Exception:  # noqa: BLE001
+                pass
             return Response(MonitorSerializer(monitor).data)
 
         want = request.data.get("is_public")
@@ -119,14 +233,23 @@ class MonitorViewSet(viewsets.ModelViewSet):
         else:
             monitor.is_public = False
         monitor.save(update_fields=["is_public", "public_slug", "updated_at"])
+        try:
+            log_audit(
+                request.user,
+                AuditEvent.Kind.SHARE_ON if want else AuditEvent.Kind.SHARE_OFF,
+                f"{'Enabled' if want else 'Disabled'} public share for “{monitor.name}”",
+                monitor_id=monitor.id,
+            )
+        except Exception:  # noqa: BLE001
+            pass
         return Response(MonitorSerializer(monitor).data)
 
     @action(detail=True, methods=["post"], url_path="check")
     def check_now(self, request, id=None):
         monitor = self.get_object()
-        if monitor.type not in (Monitor.Type.HTTP, Monitor.Type.TCP):
+        if monitor.type not in (Monitor.Type.HTTP, Monitor.Type.TCP, Monitor.Type.UDP):
             return Response(
-                {"detail": "Only HTTP and TCP monitors can be checked from the server."},
+                {"detail": "Only HTTP, TCP, and UDP monitors can be checked from the server."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
         if not monitor.is_enabled:
@@ -182,5 +305,8 @@ def public_status(request, slug: str):
             "range": range_key,
             "bar": time_buckets(monitor, range_key),
             "uptime": uptime_summary(monitor),
+            "health": health_slice(monitor, range_key),
+            "incidents": incident_log(monitor, range_key),
+            "visibility": "public",
         }
     )

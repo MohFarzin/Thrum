@@ -1,28 +1,42 @@
 import { useEffect, useState, type MouseEvent } from 'react'
 import { Link, Navigate } from 'react-router-dom'
 import { api } from '../api/client'
-import type { Monitor } from '../api/types'
+import type { HealthSlice, Monitor } from '../api/types'
 import { HeartbeatBar } from '../components/HeartbeatBar'
 import { StatusPill } from '../components/StatusPill'
+import { UptimePie } from '../components/UptimePie'
 import { useAuth } from '../hooks/useAuth'
 import { withinWindow } from '../lib/ranges'
+
+const FLEET_RANGES = [
+  { id: '1h', label: '1h' },
+  { id: '1d', label: '24h' },
+  { id: '7d', label: '7d' },
+  { id: '30d', label: '30d' },
+] as const
 
 export function Dashboard() {
   const { user, loading } = useAuth()
   const [monitors, setMonitors] = useState<Monitor[]>([])
+  const [fleet, setFleet] = useState<HealthSlice | null>(null)
+  const [fleetRange, setFleetRange] = useState<(typeof FLEET_RANGES)[number]['id']>('1d')
   const [error, setError] = useState('')
   const [favBusy, setFavBusy] = useState<string | null>(null)
 
   useEffect(() => {
     if (!user) return
-    const load = () =>
-      api<Monitor[]>('/api/monitors/')
+    const load = () => {
+      void api<Monitor[]>('/api/monitors/')
         .then(setMonitors)
         .catch((err) => setError(err instanceof Error ? err.message : 'Failed to load'))
-    void load()
-    const t = window.setInterval(() => void load(), 30000)
+      void api<HealthSlice>(`/api/monitors/fleet-health/?range=${fleetRange}`)
+        .then(setFleet)
+        .catch(() => setFleet(null))
+    }
+    load()
+    const t = window.setInterval(load, 30000)
     return () => window.clearInterval(t)
-  }, [user])
+  }, [user, fleetRange])
 
   if (loading) return <p className="meta">Loading…</p>
   if (!user) return <Navigate to="/login" replace />
@@ -56,31 +70,55 @@ export function Dashboard() {
         <div>
           <p className="eyebrow">Overview</p>
           <h1>Dashboard</h1>
-          <p className="lede">Hi {user.username} — last hour on the wire.</p>
+          <p className="lede">Hi {user.username} — fleet pulse at a glance.</p>
         </div>
-        <Link className="btn" to="/monitors/new">
-          Add monitor
-        </Link>
+        <div className="actions">
+          <Link className="btn ghost" to="/logs">
+            Audit log
+          </Link>
+          <Link className="btn" to="/monitors/new">
+            Add monitor
+          </Link>
+        </div>
       </div>
       {error ? <p className="error">{error}</p> : null}
 
-      <div className="stat-grid">
-        <article className="stat-card">
-          <span className="stat-label">Monitors</span>
-          <strong>{monitors.length}</strong>
-        </article>
-        <article className="stat-card tone-up">
-          <span className="stat-label">Up</span>
-          <strong>{up}</strong>
-        </article>
-        <article className="stat-card tone-down">
-          <span className="stat-label">Down</span>
-          <strong>{down}</strong>
-        </article>
-        <article className="stat-card tone-unknown">
-          <span className="stat-label">Unknown</span>
-          <strong>{unknown}</strong>
-        </article>
+      <div className="dash-hero">
+        <div className="dash-pie-wrap">
+          <div className="range-tabs" role="tablist" aria-label="Fleet range">
+            {FLEET_RANGES.map((r) => (
+              <button
+                key={r.id}
+                type="button"
+                role="tab"
+                aria-selected={fleetRange === r.id}
+                className={`range-tab${fleetRange === r.id ? ' on' : ''}`}
+                onClick={() => setFleetRange(r.id)}
+              >
+                {r.label}
+              </button>
+            ))}
+          </div>
+          <UptimePie health={fleet} size={200} label={`All monitors · ${fleetRange}`} />
+        </div>
+        <div className="stat-grid compact">
+          <article className="stat-card">
+            <span className="stat-label">Monitors</span>
+            <strong>{monitors.length}</strong>
+          </article>
+          <article className="stat-card tone-up">
+            <span className="stat-label">Up now</span>
+            <strong>{up}</strong>
+          </article>
+          <article className="stat-card tone-down">
+            <span className="stat-label">Down now</span>
+            <strong>{down}</strong>
+          </article>
+          <article className="stat-card tone-unknown">
+            <span className="stat-label">Unknown</span>
+            <strong>{unknown}</strong>
+          </article>
+        </div>
       </div>
 
       <div className="row-between section-head">
@@ -92,7 +130,7 @@ export function Dashboard() {
 
       {monitors.length === 0 ? (
         <div className="empty-card">
-          <p>No monitors yet. Add an HTTP, TCP, or heartbeat target to start listening.</p>
+          <p>No monitors yet. Add HTTP, TCP, UDP, or heartbeat to start listening.</p>
           <Link className="btn" to="/monitors/new">
             Create your first monitor
           </Link>
@@ -129,12 +167,13 @@ export function Dashboard() {
                 <span className="muted">
                   {m.is_enabled ? `${m.interval_seconds}s` : 'disabled'}
                 </span>
+                {m.is_public ? <span className="share-chip">public</span> : null}
               </div>
             </Link>
           ))}
         </div>
       )}
-      <p className="meta foot-note">Bars show the last hour. Open a monitor for longer ranges.</p>
+      <p className="meta foot-note">Pie uses check outcomes in the selected range. Bars show the last hour.</p>
     </section>
   )
 }

@@ -8,7 +8,7 @@ Self-hosted uptime & heartbeat monitoring — one box, open source.
   <img src="frontend/public/logo.svg" alt="THRUM mark" width="72" height="72" />
 </p>
 
-Register → add HTTP / TCP / heartbeat monitors → get Discord or email when the beat skips.
+Register → add HTTP / TCP / UDP / heartbeat monitors → get Discord or email when the beat skips.
 
 ---
 
@@ -49,8 +49,9 @@ docker compose up --build
 ## What you get (v1)
 
 - Auth — register / login / logout (session cookies)
-- Monitors — HTTP, TCP, heartbeat CRUD
-- Live checks — Celery probes HTTP/TCP; history bars (green / orange soft-fail / red)
+- Monitors — HTTP, TCP, UDP, heartbeat CRUD (TCP/UDP interval floor 60s)
+- Live checks — Celery probes HTTP/TCP/UDP; uptime pie + history bars
+- Public share — `/s/<slug>` with pie, incidents; private audit log + CSV export
 - Heartbeat agents — `POST /api/v1/heartbeat/<id>/` with API key (shown once)
 - Alerts — Discord webhook + email (SMTP on channel or env); once on down, once on recovery
 - Auto `SECRET_KEY` — no copying random keys by hand

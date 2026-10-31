@@ -20,6 +20,7 @@ class MonitorSerializer(serializers.ModelSerializer):
             "timeout_seconds",
             "expected_status_code",
             "heartbeat_grace_seconds",
+            "udp_payload",
             "status",
             "last_checked_at",
             "last_heartbeat_at",
@@ -73,16 +74,18 @@ class MonitorSerializer(serializers.ModelSerializer):
         if target is None and self.instance is not None:
             target = self.instance.target
 
-        if monitor_type in (Monitor.Type.HTTP, Monitor.Type.TCP) and not (target or "").strip():
+        if monitor_type in (Monitor.Type.HTTP, Monitor.Type.TCP, Monitor.Type.UDP) and not (
+            target or ""
+        ).strip():
             raise serializers.ValidationError(
-                {"target": "Target is required for HTTP and TCP monitors."}
+                {"target": "Target is required for HTTP, TCP, and UDP monitors."}
             )
         if monitor_type == Monitor.Type.HTTP and target:
             try:
                 assert_safe_http_url(target)
             except ValueError as exc:
                 raise serializers.ValidationError({"target": str(exc)}) from exc
-        if monitor_type == Monitor.Type.TCP and target:
+        if monitor_type in (Monitor.Type.TCP, Monitor.Type.UDP) and target:
             try:
                 parse_tcp_target(target)
             except ValueError as exc:
@@ -91,10 +94,14 @@ class MonitorSerializer(serializers.ModelSerializer):
         if interval is None and self.instance is not None:
             interval = self.instance.interval_seconds
 
-        # TCP probes are the noisy ones on small hosts — floor at 60s.
-        if monitor_type == Monitor.Type.TCP and interval is not None and int(interval) < 60:
+        # TCP/UDP probes are noisy on small hosts — floor at 60s.
+        if (
+            monitor_type in (Monitor.Type.TCP, Monitor.Type.UDP)
+            and interval is not None
+            and int(interval) < 60
+        ):
             raise serializers.ValidationError(
-                {"interval_seconds": "TCP interval must be at least 60 seconds."}
+                {"interval_seconds": f"{monitor_type.upper()} interval must be at least 60 seconds."}
             )
 
         if monitor_type == Monitor.Type.HEARTBEAT:

@@ -1,11 +1,19 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link, Navigate, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { api } from '../api/client'
-import type { BarSegment, CheckResult, Monitor, UptimeSummary } from '../api/types'
+import type {
+  BarSegment,
+  CheckResult,
+  HealthSlice,
+  Incident,
+  Monitor,
+  UptimeSummary,
+} from '../api/types'
 import { ConfirmDialog } from '../components/ConfirmDialog'
 import { HeartbeatBar } from '../components/HeartbeatBar'
 import { HeartbeatCommands } from '../components/HeartbeatCommands'
 import { StatusPill } from '../components/StatusPill'
+import { UptimePie } from '../components/UptimePie'
 import { useAuth } from '../hooks/useAuth'
 import { DETAIL_RANGES, type BarRange } from '../lib/ranges'
 
@@ -34,6 +42,8 @@ export function MonitorDetail() {
   const [results, setResults] = useState<BarSegment[]>([])
   const [recentList, setRecentList] = useState<CheckResult[]>([])
   const [uptime, setUptime] = useState<UptimeSummary | null>(null)
+  const [health, setHealth] = useState<HealthSlice | null>(null)
+  const [incidents, setIncidents] = useState<Incident[]>([])
   const [range, setRange] = useState<BarRange>('1h')
   const [error, setError] = useState('')
   const [checking, setChecking] = useState(false)
@@ -49,16 +59,23 @@ export function MonitorDetail() {
 
   const load = useCallback(async () => {
     if (!user || !id) return
-    const [m, bar, list, up] = await Promise.all([
+    const [m, bar, list, up, inc] = await Promise.all([
       api<Monitor>(`/api/monitors/${id}/`),
       api<BarSegment[]>(`/api/monitors/${id}/results/?range=${range}&bar=1`),
       api<CheckResult[]>(`/api/monitors/${id}/results/?range=1d&limit=15`),
-      api<UptimeSummary>(`/api/monitors/${id}/uptime/`),
+      api<{ summary: UptimeSummary; health: HealthSlice }>(
+        `/api/monitors/${id}/uptime/?range=${range}`,
+      ),
+      api<{ incidents: Incident[]; health: HealthSlice }>(
+        `/api/monitors/${id}/incidents/?range=${range}`,
+      ),
     ])
     setMonitor(m)
     setResults(bar)
     setRecentList(list)
-    setUptime(up)
+    setUptime(up.summary)
+    setHealth(up.health || inc.health)
+    setIncidents(inc.incidents || [])
   }, [user, id, range])
 
   useEffect(() => {
@@ -171,7 +188,8 @@ export function MonitorDetail() {
   if (error && !monitor) return <p className="error">{error}</p>
   if (!monitor) return <p className="meta">Loading…</p>
 
-  const canCheck = monitor.type === 'http' || monitor.type === 'tcp'
+  const canCheck =
+    monitor.type === 'http' || monitor.type === 'tcp' || monitor.type === 'udp'
   const isHeartbeat = monitor.type === 'heartbeat'
   const latest = recentList[0]
   const hbUrl = `${window.location.origin}/api/v1/heartbeat/${monitor.id}/`
@@ -290,6 +308,9 @@ export function MonitorDetail() {
             </button>
           </div>
         </div>
+        <div className="health-hero">
+          <UptimePie health={health} size={168} label={`Selected range · ${range}`} />
+        </div>
         <p className="meta avail-meta">
           <span className="uptime-inline">
             10m {fmtPct(uptime?.['10m'])} · 1h {fmtPct(uptime?.['1h'])} · 1d {fmtPct(uptime?.['1d'])}{' '}
@@ -304,6 +325,26 @@ export function MonitorDetail() {
           </span>
         </p>
         <HeartbeatBar status={monitor.status} results={results} onSelect={setPicked} />
+      </div>
+
+      <div className="detail-panel">
+        <div className="row-between avail-head">
+          <h2 style={{ margin: 0 }}>Incidents</h2>
+          <span className="meta">Private · {range}</span>
+        </div>
+        {incidents.length === 0 ? (
+          <p className="meta empty-inline">No downtime in this range.</p>
+        ) : (
+          <ul className="incident-list">
+            {incidents.map((inc, i) => (
+              <li key={`${inc.started_at}-${i}`}>
+                <time dateTime={inc.started_at}>{fmtTime(inc.started_at)}</time>
+                <span className="incident-dur">{inc.duration_human}</span>
+                <span className="incident-err">{inc.error_message || 'down'}</span>
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
 
       <div className="detail-panel">

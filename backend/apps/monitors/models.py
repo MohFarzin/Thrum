@@ -8,6 +8,7 @@ class Monitor(models.Model):
     class Type(models.TextChoices):
         HTTP = "http", "HTTP"
         TCP = "tcp", "TCP"
+        UDP = "udp", "UDP"
         HEARTBEAT = "heartbeat", "Heartbeat"
 
     class Status(models.TextChoices):
@@ -26,12 +27,18 @@ class Monitor(models.Model):
     target = models.CharField(
         max_length=2048,
         blank=True,
-        help_text="URL for HTTP, host:port for TCP; empty for heartbeat-only.",
+        help_text="URL for HTTP, host:port for TCP/UDP; empty for heartbeat-only.",
     )
     interval_seconds = models.PositiveIntegerField(default=60)
     timeout_seconds = models.PositiveIntegerField(default=10)
     expected_status_code = models.PositiveSmallIntegerField(default=200)
     heartbeat_grace_seconds = models.PositiveIntegerField(default=60)
+    udp_payload = models.CharField(
+        max_length=512,
+        blank=True,
+        default="",
+        help_text="Optional UDP datagram payload (empty sends a short probe).",
+    )
     api_key_prefix = models.CharField(max_length=12, blank=True, default="")
     api_key_hash = models.CharField(max_length=128, blank=True, default="")
     status = models.CharField(

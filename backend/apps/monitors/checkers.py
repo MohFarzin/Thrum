@@ -1,4 +1,4 @@
-"""HTTP and TCP probe implementations."""
+"""HTTP, TCP, and UDP probe implementations."""
 
 from __future__ import annotations
 
@@ -110,9 +110,45 @@ def check_tcp(target: str, timeout_seconds: int) -> ProbeResult:
         return ProbeResult(False, latency, error_message=_clip(str(exc) or type(exc).__name__))
 
 
+def check_udp(target: str, timeout_seconds: int, payload: str = "") -> ProbeResult:
+    """Send one UDP datagram; up if any reply arrives before timeout."""
+    started = time.monotonic()
+    try:
+        host, port = parse_tcp_target(target)
+    except ValueError as exc:
+        return ProbeResult(False, None, error_message=_clip(str(exc)))
+
+    timeout = max(1, min(int(timeout_seconds), 120))
+    data = (payload or "thrum-udp-probe").encode("utf-8", errors="replace")[:512]
+    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        sock.settimeout(timeout)
+        sock.sendto(data, (host, port))
+        sock.recvfrom(2048)
+        latency = int((time.monotonic() - started) * 1000)
+        return ProbeResult(True, latency)
+    except TimeoutError:
+        latency = int((time.monotonic() - started) * 1000)
+        return ProbeResult(False, latency, error_message="UDP timeout (no reply)")
+    except socket.timeout:
+        latency = int((time.monotonic() - started) * 1000)
+        return ProbeResult(False, latency, error_message="UDP timeout (no reply)")
+    except Exception as exc:  # noqa: BLE001
+        latency = int((time.monotonic() - started) * 1000)
+        return ProbeResult(False, latency, error_message=_clip(str(exc) or type(exc).__name__))
+    finally:
+        sock.close()
+
+
 def probe_monitor(monitor: Any) -> ProbeResult:
     if monitor.type == "http":
         return check_http(monitor.target, monitor.timeout_seconds, monitor.expected_status_code)
     if monitor.type == "tcp":
         return check_tcp(monitor.target, monitor.timeout_seconds)
-    return ProbeResult(False, None, error_message="Not an HTTP/TCP monitor")
+    if monitor.type == "udp":
+        return check_udp(
+            monitor.target,
+            monitor.timeout_seconds,
+            getattr(monitor, "udp_payload", "") or "",
+        )
+    return ProbeResult(False, None, error_message="Not a probeable monitor type")

@@ -900,3 +900,188 @@ a.text-toggle {
 .landing-more a {
   color: var(--accent-2);
 }
+
+/* —— Health pie + logs (app screens: colour on data) —— */
+.dash-hero {
+  display: grid;
+  grid-template-columns: minmax(220px, 280px) 1fr;
+  gap: 1.5rem;
+  align-items: start;
+  margin: 1.25rem 0 1.75rem;
+  padding: 1.25rem 1.35rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--panel);
+}
+@media (max-width: 720px) {
+  .dash-hero { grid-template-columns: 1fr; }
+}
+.dash-pie-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  align-items: center;
+}
+.stat-grid.compact { margin: 0; }
+.health-hero {
+  display: flex;
+  justify-content: center;
+  padding: 0.75rem 0 1rem;
+}
+.uptime-pie {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.65rem;
+}
+.pie-track { stroke: var(--line); }
+.pie-up { stroke: var(--accent); stroke-linecap: butt; }
+.pie-down { stroke: var(--danger); stroke-linecap: butt; }
+.pie-pct {
+  fill: var(--text-h);
+  font-family: var(--display);
+  font-size: 1.35rem;
+  font-weight: 700;
+}
+.pie-sub {
+  fill: var(--muted);
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.pie-caption { text-align: center; max-width: 16rem; }
+.pie-summary {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--text);
+  line-height: 1.45;
+}
+.pie-summary strong { color: var(--text-h); font-weight: 600; }
+.log-banner {
+  display: inline-block;
+  font-size: 0.75rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 0.35rem 0.65rem;
+  border-radius: 6px;
+  margin-bottom: 0.85rem;
+  border: 1px solid var(--line);
+}
+.log-banner.public {
+  color: var(--accent-2);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+.log-banner.private { color: var(--muted); background: var(--panel-2); }
+.log-panel {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--panel);
+  padding: 1rem 1.15rem;
+}
+.log-list, .incident-list { list-style: none; margin: 0; padding: 0; }
+.log-list li, .incident-list li {
+  display: grid;
+  grid-template-columns: 10.5rem 7.5rem 1fr auto;
+  gap: 0.65rem;
+  align-items: baseline;
+  padding: 0.65rem 0;
+  border-bottom: 1px solid var(--line);
+  font-size: 0.9rem;
+}
+@media (max-width: 720px) {
+  .log-list li, .incident-list li { grid-template-columns: 1fr; gap: 0.2rem; }
+}
+.log-list li:last-child, .incident-list li:last-child { border-bottom: 0; }
+.log-list time, .incident-list time {
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-variant-numeric: tabular-nums;
+}
+.log-kind, .incident-dur {
+  color: var(--accent-2);
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.log-msg, .incident-err { color: var(--text); }
+.log-link { font-size: 0.82rem; }
+.share-chip {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--accent-2);
+  border: 1px solid color-mix(in srgb, var(--accent) 40%, var(--line));
+  padding: 0.12rem 0.4rem;
+  border-radius: 4px;
+}
+.empty-inline { margin: 0.35rem 0 0; }
+.public-status .range-tabs { margin: 0.5rem 0 0.75rem; }
+
+/* —— Monitor list polish —— */
+.monitor-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) auto minmax(120px, 1fr) auto;
+  gap: 0.85rem 1rem;
+  align-items: center;
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--panel);
+  margin-bottom: 0.65rem;
+}
+@media (max-width: 800px) {
+  .monitor-row {
+    grid-template-columns: 1fr;
+    gap: 0.55rem;
+  }
+}
+.monitor-row-main { min-width: 0; }
+.monitor-row-title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin: 0 0 0.2rem;
+}
+.monitor-row-title a {
+  color: var(--text-h);
+  font-weight: 600;
+  text-decoration: none;
+}
+.monitor-row-title a:hover { color: var(--accent-2); }
+.type-badge {
+  display: inline-block;
+  font-size: 0.68rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  padding: 0.15rem 0.4rem;
+  border-radius: 4px;
+  border: 1px solid var(--line);
+  color: var(--muted);
+  background: var(--panel-2);
+}
+.type-badge.udp { border-color: color-mix(in srgb, var(--accent) 35%, var(--line)); color: var(--accent-2); }
+.monitor-row-meta {
+  margin: 0;
+  font-size: 0.82rem;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.monitor-row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  justify-content: flex-end;
+}
+.monitor-row-actions .btn { padding: 0.35rem 0.65rem; font-size: 0.82rem; }
+.page-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 1.1rem;
+}
+.page-toolbar h1 { margin: 0; }

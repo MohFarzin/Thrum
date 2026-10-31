@@ -12,6 +12,7 @@ export function MonitorsList() {
   const [monitors, setMonitors] = useState<Monitor[]>([])
   const [error, setError] = useState('')
   const [favBusy, setFavBusy] = useState<string | null>(null)
+  const [checkBusy, setCheckBusy] = useState<string | null>(null)
 
   useEffect(() => {
     if (!user) return
@@ -45,13 +46,32 @@ export function MonitorsList() {
     }
   }
 
+  async function checkNow(m: Monitor, e: MouseEvent) {
+    e.preventDefault()
+    e.stopPropagation()
+    if (checkBusy || !m.is_enabled) return
+    if (m.type !== 'http' && m.type !== 'tcp' && m.type !== 'udp') return
+    setCheckBusy(m.id)
+    setError('')
+    try {
+      const res = await api<{ monitor: Monitor }>(`/api/monitors/${m.id}/check/`, {
+        method: 'POST',
+      })
+      setMonitors((prev) => prev.map((x) => (x.id === res.monitor.id ? { ...x, ...res.monitor } : x)))
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Check failed')
+    } finally {
+      setCheckBusy(null)
+    }
+  }
+
   return (
     <section className="page">
-      <div className="row-between">
+      <div className="page-toolbar">
         <div>
           <p className="eyebrow">Targets</p>
           <h1>Monitors</h1>
-          <p className="lede">Everything THRUM is listening to · bars show 1h.</p>
+          <p className="lede">HTTP · TCP · UDP · heartbeat · bars show last 1h</p>
         </div>
         <Link className="btn" to="/monitors/new">
           New monitor
@@ -66,15 +86,27 @@ export function MonitorsList() {
           </Link>
         </div>
       ) : (
-        <div className="monitor-grid">
-          {monitors.map((m) => (
-            <Link key={m.id} className="monitor-card" to={`/monitors/${m.id}`}>
-              <div className="monitor-card-top">
-                <div>
-                  <h3>{m.name}</h3>
-                  <p className="muted truncate">{m.target || 'Heartbeat only'}</p>
+        <div className="monitor-list">
+          {monitors.map((m) => {
+            const probe = m.type === 'http' || m.type === 'tcp' || m.type === 'udp'
+            return (
+              <article key={m.id} className="monitor-row">
+                <div className="monitor-row-main">
+                  <div className="monitor-row-title">
+                    <Link to={`/monitors/${m.id}`}>{m.name}</Link>
+                    <span className={`type-badge ${m.type}`}>{m.type}</span>
+                    {m.is_public ? <span className="share-chip">public</span> : null}
+                    {!m.is_enabled ? <span className="meta">disabled</span> : null}
+                  </div>
+                  <p className="monitor-row-meta">{m.target || 'Heartbeat only'}</p>
                 </div>
-                <div className="card-actions">
+                <StatusPill status={m.status} />
+                <HeartbeatBar
+                  status={m.status}
+                  results={withinWindow(m.recent_results, 60 * 60 * 1000)}
+                  interactive={false}
+                />
+                <div className="monitor-row-actions">
                   <button
                     type="button"
                     className={`star-btn${m.is_favorite ? ' on' : ''}`}
@@ -84,22 +116,26 @@ export function MonitorsList() {
                   >
                     ★
                   </button>
-                  <StatusPill status={m.status} />
+                  {probe ? (
+                    <button
+                      type="button"
+                      className="btn ghost"
+                      disabled={checkBusy === m.id || !m.is_enabled}
+                      onClick={(e) => void checkNow(m, e)}
+                    >
+                      {checkBusy === m.id ? '…' : 'Check'}
+                    </button>
+                  ) : null}
+                  <Link className="btn ghost" to={`/monitors/${m.id}/edit`}>
+                    Edit
+                  </Link>
+                  <Link className="btn ghost" to={`/monitors/${m.id}`}>
+                    Open
+                  </Link>
                 </div>
-              </div>
-              <HeartbeatBar
-                status={m.status}
-                results={withinWindow(m.recent_results, 60 * 60 * 1000)}
-                interactive={false}
-              />
-              <div className="monitor-card-foot">
-                <span className="type-chip">{m.type}</span>
-                <span className="muted">
-                  {m.is_enabled ? `every ${m.interval_seconds}s` : 'disabled'}
-                </span>
-              </div>
-            </Link>
-          ))}
+              </article>
+            )
+          })}
         </div>
       )}
     </section>

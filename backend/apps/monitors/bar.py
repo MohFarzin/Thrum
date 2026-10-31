@@ -44,6 +44,121 @@ def cover_seconds(monitor: Monitor) -> int:
     return interval
 
 
+def _iso_or_none(dt: datetime | None) -> str | None:
+    return _iso(dt) if dt else None
+
+
+def health_slice(monitor: Monitor, range_key: str) -> dict[str, Any]:
+    """Up/down check counts + rough downtime for pie charts."""
+    delta = RANGE_DELTAS.get(range_key)
+    if not delta:
+        return {
+            "range": range_key,
+            "uptime_pct": None,
+            "up_count": 0,
+            "down_count": 0,
+            "down_seconds": 0,
+            "down_human": "—",
+        }
+    since = timezone.now() - delta
+    rows = list(
+        CheckResult.objects.filter(monitor=monitor, checked_at__gte=since)
+        .order_by("checked_at")
+        .only("checked_at", "success", "error_message")
+    )
+    up_count = sum(1 for r in rows if r.success)
+    down_count = sum(1 for r in rows if not r.success)
+    total = up_count + down_count
+    uptime_pct = round(100.0 * up_count / total, 1) if total else None
+    incidents = incident_log(monitor, range_key, rows=rows)
+    down_seconds = int(sum(i["duration_seconds"] for i in incidents))
+    return {
+        "range": range_key,
+        "uptime_pct": uptime_pct,
+        "up_count": up_count,
+        "down_count": down_count,
+        "down_seconds": down_seconds,
+        "down_human": format_duration(down_seconds),
+    }
+
+
+def format_duration(seconds: int) -> str:
+    seconds = max(0, int(seconds))
+    if seconds < 60:
+        return f"{seconds}s"
+    mins, sec = divmod(seconds, 60)
+    if mins < 60:
+        return f"{mins}m {sec}s" if sec else f"{mins}m"
+    hours, mins = divmod(mins, 60)
+    if hours < 48:
+        return f"{hours}h {mins}m" if mins else f"{hours}h"
+    days, hours = divmod(hours, 24)
+    return f"{days}d {hours}h" if hours else f"{days}d"
+
+
+def incident_log(
+    monitor: Monitor,
+    range_key: str,
+    *,
+    rows: list[CheckResult] | None = None,
+    limit: int = 40,
+) -> list[dict[str, Any]]:
+    """Collapse failed checks into downtime incidents (newest first)."""
+    delta = RANGE_DELTAS.get(range_key)
+    if not delta:
+        return []
+    since = timezone.now() - delta
+    if rows is None:
+        rows = list(
+            CheckResult.objects.filter(monitor=monitor, checked_at__gte=since)
+            .order_by("checked_at")
+            .only("checked_at", "success", "error_message")
+        )
+    else:
+        rows = sorted(
+            (r for r in rows if r.checked_at >= since),
+            key=lambda r: r.checked_at,
+        )
+
+    cover = timedelta(seconds=cover_seconds(monitor))
+    incidents: list[dict[str, Any]] = []
+    open_start: datetime | None = None
+    open_err = ""
+
+    def close(end: datetime) -> None:
+        nonlocal open_start, open_err
+        if open_start is None:
+            return
+        dur = max(0, int((end - open_start).total_seconds()))
+        incidents.append(
+            {
+                "started_at": _iso(open_start),
+                "ended_at": _iso(end),
+                "duration_seconds": dur,
+                "duration_human": format_duration(dur),
+                "error_message": open_err[:200],
+            }
+        )
+        open_start = None
+        open_err = ""
+
+    for r in rows:
+        if not r.success:
+            if open_start is None:
+                open_start = r.checked_at
+                open_err = r.error_message or "down"
+        else:
+            if open_start is not None:
+                close(r.checked_at)
+    if open_start is not None:
+        # Still open — end at last fail + cover, capped at now
+        last_fail = rows[-1].checked_at if rows and not rows[-1].success else timezone.now()
+        close(min(timezone.now(), last_fail + cover))
+
+    incidents.reverse()
+    return incidents[:limit]
+
+
 def suggested_buckets(range_key: str, interval_seconds: int) -> int:
     """Short windows: ~one slot per interval. Long windows: fixed defaults."""
     if range_key in ("10m", "1h"):

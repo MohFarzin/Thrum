@@ -4,8 +4,33 @@ export type User = {
   email: string
 }
 
-export type MonitorType = 'http' | 'tcp' | 'heartbeat'
+export type MonitorType = 'http' | 'tcp' | 'udp' | 'heartbeat'
 export type MonitorStatus = 'up' | 'down' | 'unknown'
+
+export type HealthSlice = {
+  range: string
+  uptime_pct: number | null
+  up_count: number
+  down_count: number
+  down_seconds: number
+  down_human: string
+}
+
+export type Incident = {
+  started_at: string
+  ended_at: string
+  duration_seconds: number
+  duration_human: string
+  error_message: string
+}
+
+export type AuditEvent = {
+  id: number
+  kind: string
+  message: string
+  monitor_id: string | null
+  created_at: string
+}
 
 export type CheckResult = {
   id: number
@@ -48,6 +73,7 @@ export type Monitor = {
   timeout_seconds: number
   expected_status_code: number
   heartbeat_grace_seconds: number
+  udp_payload: string
   status: MonitorStatus
   last_checked_at: string | null
   last_heartbeat_at: string | null
@@ -74,6 +100,7 @@ export type MonitorInput = {
   timeout_seconds: number
   expected_status_code: number
   heartbeat_grace_seconds: number
+  udp_payload: string
   is_enabled: boolean
 }
 
