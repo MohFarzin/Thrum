@@ -26,9 +26,26 @@ def maybe_dispatch_transition(monitor: Monitor, old_status: str, new_status: str
 
     monitor_id = str(monitor.id)
     owner_id = monitor.owner_id
-    channel_ids = list(
-        AlertChannel.objects.filter(owner_id=owner_id, is_enabled=True).values_list("id", flat=True)
-    )
+    circuit_ids = list(monitor.circuits.values_list("id", flat=True)[:10])
+
+    if circuit_ids:
+        # Circuit-scoped channels only — never the main / ungrouped channels.
+        channel_ids = list(
+            AlertChannel.objects.filter(
+                owner_id=owner_id,
+                is_enabled=True,
+                circuit_id__in=circuit_ids,
+            ).values_list("id", flat=True)
+        )
+    else:
+        # Ungrouped pulse → main Alert Channels page only.
+        channel_ids = list(
+            AlertChannel.objects.filter(
+                owner_id=owner_id,
+                is_enabled=True,
+                circuit__isnull=True,
+            ).values_list("id", flat=True)
+        )
     if not channel_ids:
         return
 
@@ -57,12 +74,15 @@ def build_alert_copy(monitor: Monitor, kind: str) -> tuple[str, str]:
     link = f"{base}/monitors/{monitor.id}"
     target = monitor.target.strip() if monitor.target else "agent heartbeat"
     when = timezone.now().strftime("%Y-%m-%d %H:%M:%S UTC")
+    circuit_names = list(monitor.circuits.values_list("name", flat=True)[:3])
+    circuit_line = f"Circuit: {', '.join(circuit_names)}\n" if circuit_names else ""
 
     if kind == "down":
         subject = f"DOWN · {monitor.name}"
         body = (
             f"{monitor.name} lost its pulse.\n\n"
             f"Type: {monitor.type}\n"
+            f"{circuit_line}"
             f"Target: {target}\n"
             f"Detected: {when}\n"
             f"Consecutive failures: {monitor.consecutive_failures}\n\n"
@@ -73,6 +93,7 @@ def build_alert_copy(monitor: Monitor, kind: str) -> tuple[str, str]:
         body = (
             f"{monitor.name} is back.\n\n"
             f"Type: {monitor.type}\n"
+            f"{circuit_line}"
             f"Target: {target}\n"
             f"Recovered: {when}\n\n"
             f"{link}"

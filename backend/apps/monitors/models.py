@@ -3,6 +3,41 @@ import uuid
 from django.conf import settings
 from django.db import models
 
+# A pulse may sit in at most this many circuits.
+MAX_CIRCUITS_PER_MONITOR = 3
+
+
+class Circuit(models.Model):
+    """Named cluster of monitors — dashboard pies + optional public stats page."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    owner = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="circuits",
+    )
+    name = models.CharField(max_length=200)
+    description = models.CharField(max_length=500, blank=True, default="")
+    sort_order = models.PositiveIntegerField(default=0)
+    is_public = models.BooleanField(default=False)
+    public_slug = models.CharField(
+        max_length=32, blank=True, null=True, unique=True, default=None
+    )
+    # When public: include per-pulse availability bars; otherwise status pills only.
+    public_show_graph = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["sort_order", "name"]
+        indexes = [
+            models.Index(fields=["owner"]),
+            models.Index(fields=["is_public", "public_slug"]),
+        ]
+
+    def __str__(self) -> str:
+        return self.name
+
 
 class Monitor(models.Model):
     class Type(models.TextChoices):
@@ -22,6 +57,12 @@ class Monitor(models.Model):
         on_delete=models.CASCADE,
         related_name="monitors",
     )
+    circuits = models.ManyToManyField(
+        Circuit,
+        through="CircuitMembership",
+        related_name="monitors",
+        blank=True,
+    )
     name = models.CharField(max_length=200)
     type = models.CharField(max_length=20, choices=Type.choices)
     target = models.CharField(
@@ -32,12 +73,19 @@ class Monitor(models.Model):
     interval_seconds = models.PositiveIntegerField(default=60)
     timeout_seconds = models.PositiveIntegerField(default=10)
     expected_status_code = models.PositiveSmallIntegerField(default=200)
+    # Optional Authorization value for HTTP checks, e.g. "Bearer …" (secret; never log).
+    http_authorization = models.CharField(max_length=512, blank=True, default="")
+    # When True, HTTP 200 body must be JSON with link_ok == true (WG / paired-host checks).
+    http_assert_link_ok = models.BooleanField(default=False)
     heartbeat_grace_seconds = models.PositiveIntegerField(default=60)
     udp_payload = models.CharField(
         max_length=512,
         blank=True,
         default="",
-        help_text="Optional UDP datagram payload (empty sends a short probe).",
+        help_text=(
+            "UDP payload: empty = short probe; 'bedrock' = Minecraft Bedrock RakNet ping; "
+            "or hex:AABBCC…"
+        ),
     )
     api_key_prefix = models.CharField(max_length=12, blank=True, default="")
     api_key_hash = models.CharField(max_length=128, blank=True, default="")
@@ -71,6 +119,30 @@ class Monitor(models.Model):
 
     def __str__(self) -> str:
         return f"{self.name} ({self.type})"
+
+
+class CircuitMembership(models.Model):
+    circuit = models.ForeignKey(
+        Circuit, on_delete=models.CASCADE, related_name="memberships"
+    )
+    monitor = models.ForeignKey(
+        Monitor, on_delete=models.CASCADE, related_name="memberships"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["circuit", "monitor"], name="uniq_circuit_monitor_membership"
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["monitor"]),
+            models.Index(fields=["circuit"]),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.monitor_id} ∈ {self.circuit_id}"
 
 
 class CheckResult(models.Model):

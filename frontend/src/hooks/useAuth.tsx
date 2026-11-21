@@ -13,8 +13,8 @@ type AuthState = {
   user: User | null
   loading: boolean
   refresh: () => Promise<void>
-  login: (username: string, password: string) => Promise<void>
-  register: (username: string, password: string, email?: string) => Promise<void>
+  login: (username: string, password: string) => Promise<User>
+  register: (username: string, password: string, email?: string) => Promise<User>
   logout: () => Promise<void>
 }
 
@@ -45,6 +45,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       body: JSON.stringify({ username, password }),
     })
     setUser(me)
+    return me
   }
 
   const register = async (username: string, password: string, email = '') => {
@@ -54,6 +55,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       body: JSON.stringify({ username, password, email }),
     })
     setUser(me)
+    return me
   }
 
   const logout = async () => {

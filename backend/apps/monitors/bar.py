@@ -96,6 +96,37 @@ def format_duration(seconds: int) -> str:
     return f"{days}d {hours}h" if hours else f"{days}d"
 
 
+def health_for_monitor_ids(monitor_ids: Iterable, range_key: str) -> dict[str, Any]:
+    """Fleet/circuit pie: aggregate check success across many monitors."""
+    ids = list(monitor_ids)[:500]
+    if range_key not in RANGE_DELTAS:
+        range_key = "1d"
+    delta = RANGE_DELTAS[range_key]
+    since = timezone.now() - delta
+    if not ids:
+        return {
+            "range": range_key,
+            "uptime_pct": None,
+            "up_count": 0,
+            "down_count": 0,
+            "down_seconds": 0,
+            "down_human": "—",
+        }
+    qs = CheckResult.objects.filter(monitor_id__in=ids, checked_at__gte=since)
+    up_count = qs.filter(success=True).count()
+    down_count = qs.filter(success=False).count()
+    total = up_count + down_count
+    down_seconds = down_count * 60
+    return {
+        "range": range_key,
+        "uptime_pct": round(100.0 * up_count / total, 1) if total else None,
+        "up_count": up_count,
+        "down_count": down_count,
+        "down_seconds": down_seconds,
+        "down_human": format_duration(down_seconds) if total else "—",
+    }
+
+
 def incident_log(
     monitor: Monitor,
     range_key: str,
@@ -183,14 +214,17 @@ def _seg_from_chunk(
     fails = total - ok
     rate = ok / total
     last = chunk[-1]
+    last_err = (last.error_message or "").strip()
     if fails == 0:
         tone = "up"
         success: bool | None = True
         err = f"{ok}/{total} ok"
     elif ok == 0:
-        tone = "down" if fails >= 2 else "warn"
+        # Total outage in this slot (even a single fail) → red, not orange.
+        # Orange is only for a first/soft fail mixed with successes.
+        tone = "down"
         success = False
-        err = f"0/{total} ok"
+        err = last_err or f"0/{total} ok"
     elif rate >= 0.8:
         tone = "up"
         success = True
@@ -198,11 +232,11 @@ def _seg_from_chunk(
     elif fails == 1:
         tone = "warn"
         success = False
-        err = f"{ok}/{total} ok"
+        err = last_err or f"{ok}/{total} ok"
     else:
         tone = "down"
         success = False
-        err = f"{ok}/{total} ok"
+        err = last_err or f"{ok}/{total} ok"
 
     latencies = [r.latency_ms for r in chunk if r.latency_ms is not None]
     return {

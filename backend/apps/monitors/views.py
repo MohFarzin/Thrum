@@ -4,20 +4,27 @@ from django.db.models import Prefetch
 from django.utils import timezone
 from rest_framework import status, viewsets
 from rest_framework.decorators import action, api_view, permission_classes
-from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.permissions import AllowAny
+
+from apps.accounts.permissions import IsApproved
 from rest_framework.response import Response
 
 from .bar import (
     DEFAULT_BUCKETS,
     RANGE_DELTAS,
+    health_for_monitor_ids,
     health_slice,
     incident_log,
     time_buckets,
     uptime_summary,
 )
 from .keys import assign_new_key
-from .models import CheckResult, Monitor
-from .serializers import CheckResultSerializer, MonitorSerializer
+from .models import CheckResult, Circuit, Monitor
+from .serializers import (
+    CheckResultSerializer,
+    CircuitSerializer,
+    MonitorSerializer,
+)
 from .services import run_monitor_check
 
 MAX_FAVORITES = 6
@@ -28,12 +35,19 @@ LIST_RESULTS_CAP = 60
 
 class MonitorViewSet(viewsets.ModelViewSet):
     serializer_class = MonitorSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsApproved]
     lookup_field = "id"
     lookup_value_regex = r"[0-9a-f-]{36}"
 
     def get_queryset(self):
-        qs = Monitor.objects.filter(owner=self.request.user)
+        qs = Monitor.objects.filter(owner=self.request.user).prefetch_related("circuits")
+        # Pulse dashboard: only monitors not in any circuit.
+        if self.action == "list" and self.request.query_params.get("unassigned") in (
+            "1",
+            "true",
+            "yes",
+        ):
+            qs = qs.filter(circuits__isnull=True)
         # Detail/update don't need embedded recent_results; list/retrieve do for bars.
         if self.action in ("list", "retrieve"):
             since = timezone.now() - LIST_RESULTS_WINDOW
@@ -95,33 +109,15 @@ class MonitorViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=["get"], url_path="fleet-health")
     def fleet_health(self, request):
-        """Aggregate up/down check ratio across the owner's monitors."""
-        from .bar import format_duration
-
+        """Aggregate up/down for ungrouped pulses (not in any circuit)."""
         range_key = (request.query_params.get("range") or "1d").strip().lower()
         if range_key not in DEFAULT_BUCKETS:
             range_key = "1d"
-        delta = RANGE_DELTAS[range_key]
-        since = timezone.now() - delta
         ids = list(
-            Monitor.objects.filter(owner=request.user).values_list("id", flat=True)[:500]
+            Monitor.objects.filter(owner=request.user, circuits__isnull=True)
+            .values_list("id", flat=True)[:500]
         )
-        qs = CheckResult.objects.filter(monitor_id__in=ids, checked_at__gte=since)
-        up_count = qs.filter(success=True).count()
-        down_count = qs.filter(success=False).count()
-        total = up_count + down_count
-        # Rough downtime: failed checks × median interval (60s floor) — honest enough for fleet glance.
-        down_seconds = down_count * 60
-        return Response(
-            {
-                "range": range_key,
-                "uptime_pct": round(100.0 * up_count / total, 1) if total else None,
-                "up_count": up_count,
-                "down_count": down_count,
-                "down_seconds": down_seconds,
-                "down_human": format_duration(down_seconds) if total else "—",
-            }
-        )
+        return Response(health_for_monitor_ids(ids, range_key))
 
     @action(detail=True, methods=["post"], url_path="favorite")
     def favorite(self, request, id=None):
@@ -281,6 +277,117 @@ class MonitorViewSet(viewsets.ModelViewSet):
         return Response(data)
 
 
+class CircuitViewSet(viewsets.ModelViewSet):
+    serializer_class = CircuitSerializer
+    permission_classes = [IsApproved]
+    lookup_field = "id"
+    lookup_value_regex = r"[0-9a-f-]{36}"
+    http_method_names = ["get", "post", "put", "patch", "delete", "head", "options"]
+
+    def get_queryset(self):
+        return Circuit.objects.filter(owner=self.request.user).prefetch_related("monitors")
+
+    def get_serializer_context(self):
+        ctx = super().get_serializer_context()
+        range_key = (self.request.query_params.get("range") or "1d").strip().lower()
+        if range_key not in DEFAULT_BUCKETS:
+            range_key = "1d"
+        ctx["health_range"] = range_key
+        return ctx
+
+    def perform_create(self, serializer):
+        serializer.save(owner=self.request.user)
+
+    @action(detail=True, methods=["get"], url_path="health")
+    def health(self, request, id=None):
+        circuit = self.get_object()
+        range_key = (request.query_params.get("range") or "1d").strip().lower()
+        if range_key not in DEFAULT_BUCKETS:
+            range_key = "1d"
+        ids = list(circuit.monitors.values_list("id", flat=True)[:500])
+        return Response(health_for_monitor_ids(ids, range_key))
+
+    @action(detail=True, methods=["get"], url_path="members")
+    def members(self, request, id=None):
+        """Circuit pulses with availability bars for the selected range (private view)."""
+        circuit = self.get_object()
+        range_key = (request.query_params.get("range") or "1h").strip().lower()
+        if range_key not in DEFAULT_BUCKETS:
+            range_key = "1h"
+        rows = []
+        for m in circuit.monitors.all()[:200]:
+            rows.append(
+                {
+                    "id": str(m.id),
+                    "name": m.name,
+                    "type": m.type,
+                    "status": m.status,
+                    "is_enabled": m.is_enabled,
+                    "interval_seconds": m.interval_seconds,
+                    "last_checked_at": m.last_checked_at,
+                    "bar": time_buckets(m, range_key),
+                }
+            )
+        return Response({"range": range_key, "monitors": rows})
+
+    @action(detail=True, methods=["post"], url_path="share")
+    def share(self, request, id=None):
+        """Enable / disable public circuit stats, rotate slug, or set show_graph."""
+        import secrets
+
+        from apps.accounts.audit import log_audit
+        from apps.accounts.models import AuditEvent
+
+        circuit = self.get_object()
+        update_fields: list[str] = ["updated_at"]
+
+        if "show_graph" in request.data:
+            circuit.public_show_graph = bool(request.data.get("show_graph"))
+            update_fields.append("public_show_graph")
+
+        if request.data.get("rotate_slug"):
+            circuit.public_slug = secrets.token_urlsafe(9)
+            circuit.is_public = True
+            update_fields.extend(["is_public", "public_slug"])
+            circuit.save(update_fields=list(dict.fromkeys(update_fields)))
+            try:
+                log_audit(
+                    request.user,
+                    AuditEvent.Kind.SHARE_ON,
+                    f"Rotated public share for circuit “{circuit.name}”",
+                )
+            except Exception:  # noqa: BLE001
+                pass
+            return Response(CircuitSerializer(circuit, context=self.get_serializer_context()).data)
+
+        if "is_public" in request.data:
+            want = bool(request.data.get("is_public"))
+            if want and not circuit.public_slug:
+                circuit.public_slug = secrets.token_urlsafe(9)
+                update_fields.append("public_slug")
+            circuit.is_public = want
+            update_fields.append("is_public")
+            circuit.save(update_fields=list(dict.fromkeys(update_fields)))
+            try:
+                log_audit(
+                    request.user,
+                    AuditEvent.Kind.SHARE_ON if want else AuditEvent.Kind.SHARE_OFF,
+                    f"{'Enabled' if want else 'Disabled'} public share for circuit “{circuit.name}”",
+                )
+            except Exception:  # noqa: BLE001
+                pass
+            return Response(CircuitSerializer(circuit, context=self.get_serializer_context()).data)
+
+        if "show_graph" in request.data:
+            circuit.save(update_fields=list(dict.fromkeys(update_fields)))
+            return Response(CircuitSerializer(circuit, context=self.get_serializer_context()).data)
+
+        return Response(
+            {"detail": "Provide is_public, show_graph, or rotate_slug."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+
 @api_view(["GET"])
 @permission_classes([AllowAny])
 def public_status(request, slug: str):
@@ -307,6 +414,59 @@ def public_status(request, slug: str):
             "uptime": uptime_summary(monitor),
             "health": health_slice(monitor, range_key),
             "incidents": incident_log(monitor, range_key),
+            "visibility": "public",
+        }
+    )
+
+
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def public_circuit_status(request, slug: str):
+    """Public circuit stats — status (+ optional bars). Never targets/keys."""
+    try:
+        circuit = Circuit.objects.prefetch_related("monitors").get(
+            public_slug=slug, is_public=True
+        )
+    except Circuit.DoesNotExist:
+        return Response({"detail": "Not found"}, status=status.HTTP_404_NOT_FOUND)
+
+    range_key = (request.query_params.get("range") or "1d").strip().lower()
+    if range_key not in DEFAULT_BUCKETS:
+        range_key = "1d"
+
+    members = list(circuit.monitors.all()[:200])
+    ids = [m.id for m in members]
+    up_now = sum(1 for m in members if m.status == Monitor.Status.UP)
+    down_now = sum(1 for m in members if m.status == Monitor.Status.DOWN)
+    unknown_now = sum(1 for m in members if m.status == Monitor.Status.UNKNOWN)
+    show_graph = bool(circuit.public_show_graph)
+
+    monitor_rows = []
+    for m in members:
+        row: dict = {
+            "name": m.name,
+            "type": m.type,
+            "status": m.status,
+            "is_enabled": m.is_enabled,
+        }
+        if show_graph:
+            row["bar"] = time_buckets(m, range_key)
+        monitor_rows.append(row)
+
+    return Response(
+        {
+            "name": circuit.name,
+            "description": circuit.description,
+            "range": range_key,
+            "show_graph": show_graph,
+            "health": health_for_monitor_ids(ids, range_key),
+            "counts": {
+                "total": len(members),
+                "up": up_now,
+                "down": down_now,
+                "unknown": unknown_now,
+            },
+            "monitors": monitor_rows,
             "visibility": "public",
         }
     )

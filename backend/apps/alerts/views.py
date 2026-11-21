@@ -1,6 +1,6 @@
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
-from rest_framework.permissions import IsAuthenticated
+from apps.accounts.permissions import IsApproved
 from rest_framework.response import Response
 
 from .dispatch import build_alert_copy
@@ -12,12 +12,17 @@ from apps.monitors.models import Monitor
 
 class AlertChannelViewSet(viewsets.ModelViewSet):
     serializer_class = AlertChannelSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsApproved]
     lookup_field = "id"
     lookup_value_regex = r"[0-9a-f-]{36}"
 
     def get_queryset(self):
-        return AlertChannel.objects.filter(owner=self.request.user)
+        qs = AlertChannel.objects.filter(owner=self.request.user)
+        circuit = (self.request.query_params.get("circuit") or "").strip()
+        if circuit:
+            return qs.filter(circuit_id=circuit)
+        # Main Alerts page = ungrouped channels only.
+        return qs.filter(circuit__isnull=True)
 
     def perform_create(self, serializer):
         serializer.save(owner=self.request.user)

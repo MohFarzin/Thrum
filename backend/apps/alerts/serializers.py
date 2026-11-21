@@ -2,6 +2,8 @@ from urllib.parse import urlparse
 
 from rest_framework import serializers
 
+from apps.monitors.models import Circuit
+
 from .models import AlertChannel
 
 _SECRET_KEYS = ("smtp_password", "webhook_url")
@@ -16,18 +18,33 @@ def _discord_webhook_ok(url: str) -> bool:
 
 
 class AlertChannelSerializer(serializers.ModelSerializer):
+    circuit = serializers.PrimaryKeyRelatedField(
+        queryset=Circuit.objects.all(),
+        allow_null=True,
+        required=False,
+    )
+
     class Meta:
         model = AlertChannel
         fields = [
             "id",
             "name",
             "type",
+            "circuit",
             "config",
             "is_enabled",
             "created_at",
             "updated_at",
         ]
         read_only_fields = ["id", "created_at", "updated_at"]
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        request = self.context.get("request")
+        if request and getattr(request, "user", None) and request.user.is_authenticated:
+            self.fields["circuit"].queryset = Circuit.objects.filter(owner=request.user)
+        else:
+            self.fields["circuit"].queryset = Circuit.objects.none()
 
     def validate(self, attrs):
         channel_type = attrs.get("type") or getattr(self.instance, "type", None)
@@ -36,6 +53,17 @@ class AlertChannelSerializer(serializers.ModelSerializer):
             config = dict(self.instance.config or {})
         else:
             config = dict(config or {})
+
+        circuit = attrs.get("circuit", getattr(self.instance, "circuit", None))
+        if circuit is not None:
+            # Circuit-bound channels are Discord-only for now.
+            if channel_type != AlertChannel.Type.DISCORD:
+                raise serializers.ValidationError(
+                    {"type": "Circuit alerts are Discord webhooks only."}
+                )
+            request = self.context.get("request")
+            if request and circuit.owner_id != request.user.id:
+                raise serializers.ValidationError({"circuit": "Circuit not found."})
 
         if channel_type == AlertChannel.Type.EMAIL:
             if not (config.get("to") or "").strip():

@@ -2,6 +2,16 @@ export type User = {
   id: number
   username: string
   email: string
+  is_approved: boolean
+  is_staff: boolean
+  /** True when Django is_staff — admin console + badge. */
+  is_admin: boolean
+  is_active: boolean
+  date_joined?: string
+}
+
+export type AdminUser = User & {
+  last_login: string | null
 }
 
 export type MonitorType = 'http' | 'tcp' | 'udp' | 'heartbeat'
@@ -69,9 +79,14 @@ export type Monitor = {
   name: string
   type: MonitorType
   target: string
+  /** Up to 3 circuits this pulse belongs to. Empty = ungrouped (Pulse list). */
+  circuits: string[]
   interval_seconds: number
   timeout_seconds: number
   expected_status_code: number
+  /** True when an Authorization header is stored (value never returned). */
+  http_authorization_set?: boolean
+  http_assert_link_ok: boolean
   heartbeat_grace_seconds: number
   udp_payload: string
   status: MonitorStatus
@@ -96,12 +111,34 @@ export type MonitorInput = {
   name: string
   type: MonitorType
   target: string
+  circuits: string[]
   interval_seconds: number
   timeout_seconds: number
   expected_status_code: number
+  http_authorization: string
+  http_assert_link_ok: boolean
   heartbeat_grace_seconds: number
   udp_payload: string
   is_enabled: boolean
+}
+
+/** Named cluster of monitors — dashboard pies + optional public stats. */
+export type Circuit = {
+  id: string
+  name: string
+  description: string
+  sort_order: number
+  is_public: boolean
+  public_slug: string | null
+  /** When public: include per-pulse bars; else status only. */
+  public_show_graph: boolean
+  monitor_count: number
+  up_now: number
+  down_now: number
+  unknown_now: number
+  health: HealthSlice
+  created_at: string
+  updated_at: string
 }
 
 export type AlertChannelType = 'email' | 'discord'
@@ -110,6 +147,8 @@ export type AlertChannel = {
   id: string
   name: string
   type: AlertChannelType
+  /** Null on main Alerts page; set for circuit Discord webhooks. */
+  circuit: string | null
   config: Record<string, string | boolean | number>
   is_enabled: boolean
   created_at: string

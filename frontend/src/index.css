@@ -1,70 +1,91 @@
 :root,
 [data-theme='dark'] {
   color-scheme: dark;
-  /* Absolute black base; green only as accent */
-  --bg0: #000000;
-  --bg1: #000000;
-  --panel: #0a0a0a;
-  --panel-2: #111111;
-  --text: #c8c8c8;
-  --text-h: #ffffff;
+  /* Deep charcoal + green accent — colour on chrome lightly, strong on data */
+  --bg0: #070a08;
+  --bg1: #0b100d;
+  --panel: #0f1612;
+  --panel-2: #14201a;
+  --sheet: #0c1210;
+  --text: #c5d0c9;
+  --text-h: #f3faf6;
   --accent: #2f9e68;
-  --accent-2: #3dba7a;
-  --muted: #888888;
-  --danger: #e85d5d;
-  --warn: #c9a227;
-  --line: #1a1a1a;
-  --input-bg: #0a0a0a;
-  --btn-fg: #000000;
-  --shadow: 0 18px 50px rgba(0, 0, 0, 0.6);
-  --glow: rgba(47, 158, 104, 0.07);
-  --glow-2: rgba(47, 158, 104, 0.04);
-  --radius: 14px;
+  --accent-2: #45c988;
+  --accent-soft: rgba(47, 158, 104, 0.14);
+  --accent-mid: rgba(47, 158, 104, 0.28);
+  --muted: #7d8f85;
+  --danger: #ef6b6b;
+  --warn: #d4a82a;
+  --line: #1c2a22;
+  --line-strong: #2a3d32;
+  --input-bg: #0a0f0c;
+  --btn-fg: #04140c;
+  --btn-primary-bg: var(--accent);
+  --btn-primary-fg: #04140c;
+  --rail: #080c0a;
+  --focus: color-mix(in srgb, var(--accent) 40%, transparent);
+  --radius: 10px;
+  --radius-sm: 8px;
   --sans: 'DM Sans', 'Segoe UI', sans-serif;
   --display: 'Syne', 'Trebuchet MS', sans-serif;
+  --mono: 'JetBrains Mono', 'Cascadia Code', ui-monospace, monospace;
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-spring: cubic-bezier(0.34, 1.4, 0.64, 1);
+  --dur: 160ms;
+  --rail-w: 76px;
 }
 
 [data-theme='light'] {
   color-scheme: light;
-  --bg0: #ffffff;
-  --bg1: #f5f5f5;
+  --bg0: #f4faf6;
+  --bg1: #eaf4ee;
   --panel: #ffffff;
-  --panel-2: #fafafa;
-  --text: #333333;
-  --text-h: #000000;
+  --panel-2: #f2f8f4;
+  --sheet: #ffffff;
+  --text: #3a4a41;
+  --text-h: #0c1a12;
   --accent: #1f8f5a;
   --accent-2: #157a4a;
-  --muted: #666666;
+  --accent-soft: rgba(31, 143, 90, 0.1);
+  --accent-mid: rgba(31, 143, 90, 0.2);
+  --muted: #667a6e;
   --danger: #c43c3c;
   --warn: #9a7a12;
-  --line: #e0e0e0;
+  --line: #d5e4da;
+  --line-strong: #b8cfbf;
   --input-bg: #ffffff;
   --btn-fg: #ffffff;
-  --shadow: 0 14px 40px rgba(0, 0, 0, 0.08);
-  --glow: rgba(31, 143, 90, 0.08);
-  --glow-2: rgba(31, 143, 90, 0.04);
+  --btn-primary-bg: var(--accent);
+  --btn-primary-fg: #ffffff;
+  --rail: #eef6f1;
+  --focus: color-mix(in srgb, var(--accent) 30%, transparent);
 }
 
 @media (prefers-color-scheme: light) {
   :root:not([data-theme]) {
     color-scheme: light;
-    --bg0: #ffffff;
-    --bg1: #f5f5f5;
+    --bg0: #f4faf6;
+    --bg1: #eaf4ee;
     --panel: #ffffff;
-    --panel-2: #fafafa;
-    --text: #333333;
-    --text-h: #000000;
+    --panel-2: #f2f8f4;
+    --sheet: #ffffff;
+    --text: #3a4a41;
+    --text-h: #0c1a12;
     --accent: #1f8f5a;
     --accent-2: #157a4a;
-    --muted: #666666;
+    --accent-soft: rgba(31, 143, 90, 0.1);
+    --accent-mid: rgba(31, 143, 90, 0.2);
+    --muted: #667a6e;
     --danger: #c43c3c;
     --warn: #9a7a12;
-    --line: #e0e0e0;
+    --line: #d5e4da;
+    --line-strong: #b8cfbf;
     --input-bg: #ffffff;
     --btn-fg: #ffffff;
-    --shadow: 0 14px 40px rgba(0, 0, 0, 0.08);
-    --glow: rgba(31, 143, 90, 0.08);
-    --glow-2: rgba(31, 143, 90, 0.04);
+    --btn-primary-bg: var(--accent);
+    --btn-primary-fg: #ffffff;
+    --rail: #eef6f1;
+    --focus: color-mix(in srgb, var(--accent) 30%, transparent);
   }
 }
 
@@ -72,17 +93,24 @@
   box-sizing: border-box;
 }
 
+html {
+  scroll-behavior: smooth;
+}
+
 body {
   margin: 0;
   min-height: 100svh;
   font-family: var(--sans);
+  font-size: 15px;
+  line-height: 1.45;
   color: var(--text);
   background: var(--bg0);
   -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 
 a {
-  color: var(--accent);
+  color: var(--accent-2);
 }
 
 h1,
@@ -90,28 +118,43 @@ h2,
 h3 {
   font-family: var(--display);
   color: var(--text-h);
-  margin: 0 0 0.5rem;
-  letter-spacing: -0.02em;
-}
-
-h1 {
-  font-size: clamp(1.85rem, 4vw, 2.4rem);
-  font-weight: 700;
-}
-
-h2 {
-  font-size: 1.15rem;
+  margin: 0 0 0.35rem;
+  letter-spacing: -0.03em;
   font-weight: 650;
 }
 
-h3 {
+h1 {
+  font-size: clamp(1.65rem, 3vw, 1.95rem);
+  font-weight: 700;
+  letter-spacing: -0.04em;
+}
+
+h2 {
   font-size: 1.05rem;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+}
+
+h3 {
+  font-size: 1rem;
   font-weight: 650;
   margin: 0;
 }
 
-code {
-  font-size: 0.88em;
-  word-break: break-all;
-  color: var(--accent-2);
+code,
+.mono {
+  font-family: var(--mono);
+  font-size: 0.86em;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-h);
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+::selection {
+  background: color-mix(in srgb, var(--accent) 40%, transparent);
+  color: var(--text-h);
 }

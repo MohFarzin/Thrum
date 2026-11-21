@@ -85,8 +85,8 @@ export function Landing() {
         </p>
         <div className="actions">
           {user ? (
-            <Link className="btn" to="/dashboard">
-              Open dashboard
+            <Link className="btn" to={user.is_admin || user.is_approved ? '/dashboard' : '/waiting'}>
+              {user.is_admin || user.is_approved ? 'Open dashboard' : 'Waiting for approval'}
             </Link>
           ) : (
             <>
@@ -178,7 +178,7 @@ export function Landing() {
         )}
         {user && monitors.length > 6 && shown.length > 0 ? (
           <p className="meta landing-more">
-            Showing {shown.length} pinned · <Link to="/monitors">view all</Link>
+            Showing {shown.length} pinned · <Link to="/dashboard">open dashboard</Link>
           </p>
         ) : null}
       </div>

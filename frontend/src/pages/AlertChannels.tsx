@@ -104,7 +104,8 @@ export function AlertChannels() {
       <p className="eyebrow">Notifications</p>
       <h1>Alert channels</h1>
       <p className="lede">
-        One message when a monitor goes down (after 2 failed checks), one when it recovers.
+        For ungrouped pulses only. Circuit Discord webhooks live on each circuit page — they never
+        mix with these.
       </p>
       {error ? <p className="error">{error}</p> : null}
       {msg ? <p className="meta">{msg}</p> : null}

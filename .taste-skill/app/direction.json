@@ -1,0 +1,182 @@
+{
+ "version": 1,
+ "kind": "app",
+ "at": "2026-10-31T16:57:39.741Z",
+ "seed": 685952486,
+ "input": {
+  "kind": "analytics",
+  "brief": "THRUM pulse monitoring control panel — absolute black, green accent, uptime telemetry",
+  "theme": null,
+  "screens": [
+   "analytics",
+   "list",
+   "detail"
+  ],
+  "keep": [
+   "palette",
+   "type"
+  ],
+  "style": "achromatic-ledger"
+ },
+ "style": {
+  "id": "achromatic-ledger",
+  "name": "Achromatic ledger",
+  "theme": "light",
+  "basis": "4 screens: a seller home, a per-agent insights page, a generated report, a settings page with usage numbers",
+  "suits": [
+   "finance",
+   "commerce",
+   "devtools",
+   "support",
+   "report",
+   "workspace",
+   "builder"
+  ],
+  "idea": "The chrome holds no colour at all; money and counts are set in ink, the one chart hue marks the screen's main data element, and the only other hue is a small signal where a figure changed.",
+  "colourBudget": "under 1% coloured pixels; the chrome is ink, the one chart hue goes on the main data element, and the only other hue is a small change signal",
+  "tokens": {
+   "ground": "#f8f8f8",
+   "surface": "#ffffff",
+   "raised": "#eeeeee",
+   "border": "#e6e6e6",
+   "rule": "#f0f0f0",
+   "control": "#d4d4d4",
+   "text": "#0a0a0a",
+   "muted": "#6b6b6b",
+   "accent": "#141414",
+   "positive": "#2e7d32",
+   "negative": "#c4242a",
+   "warning": "#92400e",
+   "chart": [
+    "#141414",
+    "#8a8a8a",
+    "#1d5fbf"
+   ],
+   "pills": {
+    "positive": [
+     "#dcfae5",
+     "#04250e"
+    ],
+    "negative": [
+     "#ffedea",
+     "#831c1e"
+    ],
+    "warning": [
+     "#fffbeb",
+     "#92400e"
+    ],
+    "neutral": [
+     "#eeeeee",
+     "#3d3d3d"
+    ]
+   },
+   "radius": {
+    "card": 8,
+    "control": 6
+   },
+   "font": {
+    "family": "Geist",
+    "second": "Geist Mono, for IDs and keys only",
+    "fallback": "Inter, system-ui, sans-serif",
+    "sizes": {
+     "title": 24,
+     "section": 16,
+     "kpi": 30,
+     "body": 14,
+     "small": 12
+    },
+    "weights": [
+     400,
+     500,
+     700
+    ],
+    "note": "700 is for money figures only; every other number is 400-500."
+   },
+   "density": "sparse",
+   "rowHeight": 44,
+   "sidebarWidth": 256,
+   "gap": 12,
+   "pad": 24,
+   "controlHeight": 36
+  },
+  "shell": "open-plane",
+  "shellAlternatives": [
+   "icon-rail",
+   "no-sidebar"
+  ],
+  "signature": "No brand colour anywhere in the chrome: the one primary action is near-black (a grey pill, #e5e5e5, is the secondary), the main data element (today's series, the booked bars, the current period) takes the one chart hue, #1d5fbf, and everything else is drawn in ink with the comparison or the part after the cursor in grey, zero balances are set in grey, and the only hue on the screen is a small triangle or a short coloured number where a figure changed.",
+  "identity": [
+   "A ground from the product's world in place of #f8f8f8, one level off white and low in chroma: a stone (#f4f3f1) for a bakery or a shop, a sage (#f2f5f2) for a garden or a greenhouse, a blue-grey (#f2f4f7) for a ledger or a meter. Cards stay white; a warm tint stays under the cream check (saturation under about 15%).",
+   "The one chart hue (#1d5fbf, or the brand's own hue at 3:1 or more on white) on the screen's main data element: today's line, the booked bars, the current period's column, the margin that breaks. The chrome stays ink and the hue stays under 1% of the screen.",
+   "Every figure in Geist Mono, as the style's decision, so money and counts read as a ledger's columns while the text stays Geist. Lint and the inspector flag mono; give the reason in the report."
+  ],
+  "avoid": [
+   "a brand-coloured primary button",
+   "tinted cards or tinted KPI tiles",
+   "a coloured chart where one series in ink says it",
+   "bold on anything but money",
+   "a chart with no y-scale (the study's one example of this look hid magnitude behind hover and was flagged)",
+   "a grey pill as the only button for the screen's main job: in testing an Approve repeated in grey on every row left the screen without a primary"
+  ],
+  "notes": "The studied screens of this kind used 11-12px card radii, which §9.4 counts among the rare middle values; the library sets the tight pair (8 and 6) so the style lands on the bimodal rule. After testing, the chart hue moved from an unused third series colour onto the main data element: a screen whose only hue was a delta read as a kit."
+ },
+ "shell": {
+  "id": "icon-rail",
+  "name": "Icon rail",
+  "basis": "3 of 23 screens",
+  "suits": [
+   "markets",
+   "devtools",
+   "finance",
+   "wallet"
+  ],
+  "numbers": {
+   "railWidth": "50-60, median 55",
+   "icon": "15-18px outline",
+   "pitch": "34-49",
+   "active": "icon colour alone, or a full-bleed 50px band at a 2% tint, or a 1px accent bar on the rail's border",
+   "groups": "short 20px hairlines, no labels",
+   "utilities": "pushed to the bottom after a gap of about 200px"
+  },
+  "blueprint": "An unlabelled rail of 50-60px carries the brand mark at the top and 15-18px outline icons on a 34-49px pitch; groups are split by 20px hairlines, utilities sit at the bottom. The rail sits on the page ground with a 1px edge, or is white with a faint 4px shadow on a grey ground. It saves about 180px of width against a labelled sidebar, so it suits products with few destinations and screens that need the width. Icons need tooltips and an accessible name.",
+  "phone": "The rail becomes a bottom bar with the same four or five icons, each with a short label under it."
+ },
+ "screens": [
+  {
+   "name": "analytics",
+   "pattern": {
+    "id": "chart-pairs",
+    "name": "Per-period and running-total pairs",
+    "screen": "analytics",
+    "kinds": [
+     "community",
+     "smb-admin",
+     "analytics"
+    ],
+    "basis": "a network analytics overview",
+    "blueprint": "Title at 24-32px with one sentence under it saying what the filters do, then one filter row of 36-38px controls (one filled or near-black, the rest borderless or text, a reset link last) and 16-24px to the KPIs. KPI row: 3 equal cards in the content column (3 x 372 + 2 x 17 = 1152 in the study) or one divided container; a 16px label over the value with the change written as a phrase on the value's baseline ('+8 in the last 90 days'), grey when it is zero. Then one row per metric: the per-period column chart on the left and its cumulative line on the right, at equal width (2 x 568 + 16 = 1152) and with the same x ticks; square bars, a 2px straight line, integer ticks from zero, no legend because each chart has one series. One gap value horizontally and vertically.",
+    "phone": "Pairs stack, the cumulative chart directly under its per-period chart; KPI cards become a single column of label-value rows."
+   }
+  },
+  {
+   "name": "list",
+   "pattern": null
+  },
+  {
+   "name": "detail",
+   "pattern": {
+    "id": "object-detail-header-grid",
+    "name": "Object header and a six-column grid",
+    "screen": "detail",
+    "kinds": [
+     "community",
+     "commerce",
+     "analytics"
+    ],
+    "basis": "an event's analytics tab",
+    "blueprint": "The page header is the object itself: one card (88px, 14px padding) holding a 50x62 cover, the 18/600 name with 28px icon buttons beside it (open, copy, share), a 13px grey meta line (date, time, place) and outlined 36px actions on the right. Under it, underline tabs on a full-width 1px rule, then a 36px row with a segmented time range on the left and a refresh button on the right. The body is one 6-column grid with one gutter (14px) in both directions whose spans change by row while every edge lands on the same lines: 3 KPI tiles of 2 columns, the main chart in 4 columns beside a side chart in 2, two progress cards of 3, a full-width trend of 6. Give the widest card to the screen's question, and do not give 824px to one ring and one legend row (flagged).",
+    "phone": "The header card keeps cover, name and meta, with actions in a kebab; every grid item takes the full width in the same order."
+   }
+  }
+ ]
+}

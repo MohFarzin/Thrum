@@ -1,6 +1,20 @@
 from django.contrib import admin
 
-from .models import CheckResult, Monitor
+from .models import CheckResult, Circuit, CircuitMembership, Monitor
+
+
+@admin.register(Circuit)
+class CircuitAdmin(admin.ModelAdmin):
+    list_display = ("name", "owner", "is_public", "sort_order", "created_at")
+    list_filter = ("is_public",)
+    search_fields = ("name", "owner__username", "public_slug")
+    readonly_fields = ("id", "public_slug", "created_at", "updated_at")
+
+
+@admin.register(CircuitMembership)
+class CircuitMembershipAdmin(admin.ModelAdmin):
+    list_display = ("circuit", "monitor", "created_at")
+    search_fields = ("circuit__name", "monitor__name")
 
 
 @admin.register(Monitor)

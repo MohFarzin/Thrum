@@ -34,7 +34,45 @@ def _clip(msg: str) -> str:
     return msg[:MAX_ERROR_LEN]
 
 
-def check_http(url: str, timeout_seconds: int, expected_status: int) -> ProbeResult:
+def _http_headers(authorization: str = "") -> dict[str, str]:
+    headers = {"User-Agent": "THRUM-Checker/1.0", "Accept": "*/*"}
+    auth = (authorization or "").strip()
+    if auth:
+        headers["Authorization"] = auth[:512]
+    return headers
+
+
+def _assert_link_ok_body(raw: bytes) -> str | None:
+    """Return error message if JSON link_ok is missing/false; None if OK."""
+    import json
+
+    try:
+        data = json.loads(raw.decode("utf-8", errors="replace"))
+    except (UnicodeDecodeError, json.JSONDecodeError, ValueError):
+        return "Expected JSON with link_ok"
+    if not isinstance(data, dict):
+        return "Expected JSON object with link_ok"
+    if data.get("link_ok") is True:
+        # Optional handshake age when present
+        wg = data.get("wireguard") if isinstance(data.get("wireguard"), dict) else {}
+        age = wg.get("handshake_age_seconds")
+        try:
+            if age is not None and int(age) > 90:
+                return f"WG link stale — handshake_age_seconds={int(age)}"
+        except (TypeError, ValueError):
+            pass
+        return None
+    return "WG link broken — link_ok is not true"
+
+
+def check_http(
+    url: str,
+    timeout_seconds: int,
+    expected_status: int,
+    *,
+    authorization: str = "",
+    assert_link_ok: bool = False,
+) -> ProbeResult:
     started = time.monotonic()
     try:
         current = assert_safe_http_url(url)
@@ -43,25 +81,31 @@ def check_http(url: str, timeout_seconds: int, expected_status: int) -> ProbeRes
 
     timeout = max(1, min(int(timeout_seconds), 120))
     opener = urllib.request.build_opener(_NoRedirect)
+    headers = _http_headers(authorization)
 
     for _ in range(MAX_REDIRECTS + 1):
         try:
             req = urllib.request.Request(
                 current,
                 method="GET",
-                headers={"User-Agent": "THRUM-Checker/1.0", "Accept": "*/*"},
+                headers=headers,
             )
             with opener.open(req, timeout=timeout) as resp:
                 code = int(getattr(resp, "status", None) or resp.getcode())
-                resp.read(1024)
+                body = resp.read(65536)
                 latency = int((time.monotonic() - started) * 1000)
-                ok = code == int(expected_status)
-                return ProbeResult(
-                    success=ok,
-                    latency_ms=latency,
-                    status_code=code,
-                    error_message="" if ok else _clip(f"Expected {expected_status}, got {code}"),
-                )
+                if code != int(expected_status):
+                    return ProbeResult(
+                        False,
+                        latency,
+                        code,
+                        _clip(f"Expected {expected_status}, got {code}"),
+                    )
+                if assert_link_ok:
+                    link_err = _assert_link_ok_body(body)
+                    if link_err:
+                        return ProbeResult(False, latency, code, _clip(link_err))
+                return ProbeResult(True, latency, code, "")
         except urllib.error.HTTPError as exc:
             latency = int((time.monotonic() - started) * 1000)
             code = int(exc.code)
@@ -75,12 +119,20 @@ def check_http(url: str, timeout_seconds: int, expected_status: int) -> ProbeRes
                     continue
                 except ValueError as verr:
                     return ProbeResult(False, latency, code, _clip(str(verr)))
-            ok = code == int(expected_status)
+            if code == int(expected_status) and assert_link_ok:
+                try:
+                    body = exc.read(65536)
+                except Exception:  # noqa: BLE001
+                    body = b""
+                link_err = _assert_link_ok_body(body)
+                if link_err:
+                    return ProbeResult(False, latency, code, _clip(link_err))
+                return ProbeResult(True, latency, code, "")
             return ProbeResult(
-                success=ok,
-                latency_ms=latency,
-                status_code=code,
-                error_message="" if ok else _clip(f"Expected {expected_status}, got {code}"),
+                False,
+                latency,
+                code,
+                _clip(f"Expected {expected_status}, got {code}"),
             )
         except Exception as exc:  # noqa: BLE001 — surface as check failure
             latency = int((time.monotonic() - started) * 1000)
@@ -91,6 +143,21 @@ def check_http(url: str, timeout_seconds: int, expected_status: int) -> ProbeRes
         int((time.monotonic() - started) * 1000),
         error_message="Too many redirects",
     )
+
+
+def _port_unreachable_message(exc: BaseException, *, host: str, port: int) -> str:
+    """Human label when TCP/UDP cannot reach the port."""
+    raw = str(exc) or type(exc).__name__
+    low = raw.lower()
+    if isinstance(exc, ConnectionRefusedError) or "111" in raw or "refused" in low:
+        return f"Port {port} unreachable — connection refused"
+    if isinstance(exc, TimeoutError) or "timed out" in low or "timeout" in low:
+        return f"Port {port} unreachable — timed out"
+    if "name or service not known" in low or "getaddrinfo" in low or "nodename" in low:
+        return f"Host unreachable — DNS failed for {host}"
+    if "network is unreachable" in low or "no route" in low:
+        return f"Port {port} unreachable — no route to host"
+    return _clip(raw)
 
 
 def check_tcp(target: str, timeout_seconds: int) -> ProbeResult:
@@ -107,7 +174,48 @@ def check_tcp(target: str, timeout_seconds: int) -> ProbeResult:
             return ProbeResult(True, latency)
     except Exception as exc:  # noqa: BLE001
         latency = int((time.monotonic() - started) * 1000)
-        return ProbeResult(False, latency, error_message=_clip(str(exc) or type(exc).__name__))
+        return ProbeResult(
+            False,
+            latency,
+            error_message=_port_unreachable_message(exc, host=host, port=port),
+        )
+
+
+# RakNet magic used by Minecraft Bedrock unconnected ping / pong.
+_RAKNET_MAGIC = bytes.fromhex("00ffff00fefefefefdfdfdfd12345678")
+
+
+def bedrock_unconnected_ping() -> bytes:
+    """Minecraft Bedrock (RakNet) Unconnected Ping — elicits Unconnected Pong."""
+    import os
+    import struct
+
+    ts = int(time.time() * 1000) & 0xFFFFFFFFFFFFFFFF
+    guid = int.from_bytes(os.urandom(8), "big")
+    return b"\x01" + struct.pack(">Q", ts) + _RAKNET_MAGIC + struct.pack(">Q", guid)
+
+
+def udp_datagram(payload: str = "") -> bytes:
+    """Build UDP bytes from form payload.
+
+    - empty → short ASCII probe (generic services)
+    - bedrock / raknet / minecraft-bedrock → Bedrock RakNet ping
+    - hex:AABBCC… → raw hex bytes
+    - otherwise → UTF-8 text (capped)
+    """
+    raw = (payload or "").strip()
+    key = raw.lower()
+    if key in ("bedrock", "raknet", "minecraft-bedrock", "mcbe"):
+        return bedrock_unconnected_ping()
+    if key.startswith("hex:"):
+        hexpart = key[4:].replace(" ", "").replace("0x", "")
+        try:
+            return bytes.fromhex(hexpart)[:512]
+        except ValueError:
+            return b"thrum-udp-probe"
+    if not raw:
+        return b"thrum-udp-probe"
+    return raw.encode("utf-8", errors="replace")[:512]
 
 
 def check_udp(target: str, timeout_seconds: int, payload: str = "") -> ProbeResult:
@@ -119,7 +227,7 @@ def check_udp(target: str, timeout_seconds: int, payload: str = "") -> ProbeResu
         return ProbeResult(False, None, error_message=_clip(str(exc)))
 
     timeout = max(1, min(int(timeout_seconds), 120))
-    data = (payload or "thrum-udp-probe").encode("utf-8", errors="replace")[:512]
+    data = udp_datagram(payload)
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     try:
         sock.settimeout(timeout)
@@ -129,20 +237,34 @@ def check_udp(target: str, timeout_seconds: int, payload: str = "") -> ProbeResu
         return ProbeResult(True, latency)
     except TimeoutError:
         latency = int((time.monotonic() - started) * 1000)
-        return ProbeResult(False, latency, error_message="UDP timeout (no reply)")
+        return ProbeResult(
+            False, latency, error_message=f"Port {port} unreachable — no UDP reply"
+        )
     except socket.timeout:
         latency = int((time.monotonic() - started) * 1000)
-        return ProbeResult(False, latency, error_message="UDP timeout (no reply)")
+        return ProbeResult(
+            False, latency, error_message=f"Port {port} unreachable — no UDP reply"
+        )
     except Exception as exc:  # noqa: BLE001
         latency = int((time.monotonic() - started) * 1000)
-        return ProbeResult(False, latency, error_message=_clip(str(exc) or type(exc).__name__))
+        return ProbeResult(
+            False,
+            latency,
+            error_message=_port_unreachable_message(exc, host=host, port=port),
+        )
     finally:
         sock.close()
 
 
 def probe_monitor(monitor: Any) -> ProbeResult:
     if monitor.type == "http":
-        return check_http(monitor.target, monitor.timeout_seconds, monitor.expected_status_code)
+        return check_http(
+            monitor.target,
+            monitor.timeout_seconds,
+            monitor.expected_status_code,
+            authorization=getattr(monitor, "http_authorization", "") or "",
+            assert_link_ok=bool(getattr(monitor, "http_assert_link_ok", False)),
+        )
     if monitor.type == "tcp":
         return check_tcp(monitor.target, monitor.timeout_seconds)
     if monitor.type == "udp":

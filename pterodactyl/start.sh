@@ -166,6 +166,20 @@ createdb -h 127.0.0.1 -p 5432 -U thrum thrum 2>/dev/null || true
 ok "listening on 127.0.0.1:5432"
 
 cd /home/container/backend
+mkdir -p staticfiles
+
+# Allocation-aware CSRF when the egg field is left blank.
+PORT="${SERVER_PORT:-8080}"
+if [[ -z "${CSRF_TRUSTED_ORIGINS:-}" ]]; then
+  _origins=""
+  if [[ -n "${SERVER_IP:-}" ]]; then
+    _origins="http://${SERVER_IP}:${PORT}"
+  fi
+  if [[ -n "${THRUM_PUBLIC_BASE_URL:-}" && "${THRUM_PUBLIC_BASE_URL}" != "http://localhost" ]]; then
+    _origins="${_origins:+${_origins},}${THRUM_PUBLIC_BASE_URL}"
+  fi
+  export CSRF_TRUSTED_ORIGINS="${_origins}"
+fi
 
 step "Database migrate"
 python manage.py migrate --noinput
@@ -176,18 +190,27 @@ python manage.py run_checker &
 CHECKER_PID=$!
 ok "checker pid ${CHECKER_PID}"
 
-PORT="${SERVER_PORT:-8080}"
 WORKERS="${GUNICORN_WORKERS:-1}"
 TIMEOUT="${GUNICORN_TIMEOUT:-120}"
+
+_public_hint="http://0.0.0.0:${PORT}/"
+if [[ -n "${THRUM_PUBLIC_BASE_URL:-}" && "${THRUM_PUBLIC_BASE_URL}" != "http://localhost" ]]; then
+  _public_hint="${THRUM_PUBLIC_BASE_URL}"
+elif [[ -n "${SERVER_IP:-}" ]]; then
+  _public_hint="http://${SERVER_IP}:${PORT}/"
+fi
 
 echo ""
 echo "  ------------------------------------------"
 echo "  Ready"
-echo "    UI / API  ->  http://0.0.0.0:${PORT}/"
-echo "    Health    ->  http://0.0.0.0:${PORT}/api/health/"
-echo "    Secret    ->  ${SECRET_FILE}"
+echo "    Open in browser (HTTP only):"
+echo "      ${_public_hint}"
+echo "    Health  ->  ${_public_hint%/}/api/health/"
+echo "    Secret  ->  ${SECRET_FILE}"
 echo "  ------------------------------------------"
-echo "  Tip: use http:// (not https) on the allocation port."
+echo "  IMPORTANT: use http:// — NOT https://"
+echo "  HTTPS on this port causes 'Invalid HTTP method' noise"
+echo "  and the page will not load (no TLS on the egg)."
 echo ""
 
 THREADS="${GUNICORN_THREADS:-1}"

@@ -21,6 +21,21 @@ CSRF_TRUSTED_ORIGINS = [
     if o.strip()
 ]
 
+
+def _append_csrf_origin(origin: str) -> None:
+    origin = (origin or "").strip().rstrip("/")
+    if origin and origin not in CSRF_TRUSTED_ORIGINS:
+        CSRF_TRUSTED_ORIGINS.append(origin)
+
+
+# Panel / egg often leave CSRF blank — derive from public URL + allocation.
+_append_csrf_origin(os.environ.get("THRUM_PUBLIC_BASE_URL", ""))
+_server_ip = (os.environ.get("SERVER_IP") or "").strip()
+_server_port = (os.environ.get("SERVER_PORT") or "").strip()
+if _server_ip and _server_port:
+    _append_csrf_origin(f"http://{_server_ip}:{_server_port}")
+    # Common Wings alias hostname patterns are set via PUBLIC URL; keep IP form too.
+
 INSTALLED_APPS = [
     "django.contrib.admin",
     "django.contrib.auth",
@@ -30,7 +45,7 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "corsheaders",
     "rest_framework",
-    "apps.accounts",
+    "apps.accounts.apps.AccountsConfig",
     "apps.monitors",
     "apps.ingest",
     "apps.alerts",
@@ -53,8 +68,9 @@ _SPA_DIST = REPO_ROOT / "frontend" / "dist"
 if _SPA_DIST.is_dir():
     WHITENOISE_ROOT = str(_SPA_DIST)
     WHITENOISE_INDEX_FILE = True
-    # Off by default (CPU). Set WHITENOISE_AUTOREFRESH=1 while hot-patching dist without restart.
-    WHITENOISE_AUTOREFRESH = os.environ.get("WHITENOISE_AUTOREFRESH", "0").lower() in (
+    # On by default so hot-patched frontend/dist hashes match SpaIndexView without a full restart.
+    # Set WHITENOISE_AUTOREFRESH=0 to disable (slightly less CPU).
+    WHITENOISE_AUTOREFRESH = os.environ.get("WHITENOISE_AUTOREFRESH", "1").lower() in (
         "1",
         "true",
         "yes",
@@ -114,8 +130,9 @@ REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [
         "rest_framework.authentication.SessionAuthentication",
     ],
+    # App APIs require an approved (or staff) account. Auth/me stays explicit.
     "DEFAULT_PERMISSION_CLASSES": [
-        "rest_framework.permissions.IsAuthenticated",
+        "apps.accounts.permissions.IsApproved",
     ],
 }
 

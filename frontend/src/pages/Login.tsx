@@ -10,15 +10,19 @@ export function Login() {
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
 
-  if (user) return <Navigate to="/dashboard" replace />
+  if (user) {
+    if (user.is_admin || user.is_approved) return <Navigate to="/dashboard" replace />
+    return <Navigate to="/waiting" replace />
+  }
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault()
     setBusy(true)
     setError('')
     try {
-      await login(username, password)
-      navigate('/dashboard')
+      const me = await login(username, password)
+      if (me.is_admin || me.is_approved) navigate('/dashboard')
+      else navigate('/waiting')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Login failed')
     } finally {
@@ -33,7 +37,12 @@ export function Login() {
       <form onSubmit={onSubmit}>
         <label>
           Username
-          <input value={username} onChange={(e) => setUsername(e.target.value)} required />
+          <input
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+            autoComplete="username"
+            required
+          />
         </label>
         <label>
           Password
@@ -41,6 +50,7 @@ export function Login() {
             type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
+            autoComplete="current-password"
             required
           />
         </label>

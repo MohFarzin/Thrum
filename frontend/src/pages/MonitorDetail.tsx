@@ -161,7 +161,7 @@ export function MonitorDetail() {
     try {
       if (confirm === 'delete') {
         await api(`/api/monitors/${id}/`, { method: 'DELETE' })
-        navigate('/monitors')
+        navigate('/dashboard')
         return
       }
       if (confirm === 'refresh-share') {
@@ -202,8 +202,8 @@ export function MonitorDetail() {
 
   return (
     <section className="page">
-      <Link className="back-link" to="/monitors">
-        ← Monitors
+      <Link className="back-link" to="/dashboard">
+        ← Dashboard
       </Link>
       <div className="detail-hero">
         <div>
@@ -393,36 +393,66 @@ export function MonitorDetail() {
         )}
       </div>
 
-      <dl className="detail-grid">
-        <dt>Interval</dt>
-        <dd>{monitor.interval_seconds}s</dd>
-        <dt>Timeout</dt>
-        <dd>{monitor.timeout_seconds}s</dd>
-        {monitor.type === 'http' ? (
-          <>
-            <dt>Expected status</dt>
-            <dd>{monitor.expected_status_code}</dd>
-          </>
-        ) : null}
-        {isHeartbeat ? (
-          <>
-            <dt>Grace</dt>
-            <dd>{monitor.heartbeat_grace_seconds}s</dd>
-          </>
-        ) : null}
-        <dt>Last check</dt>
-        <dd>{fmtTime(monitor.last_checked_at)}</dd>
-        <dt>Last heartbeat</dt>
-        <dd>{fmtTime(monitor.last_heartbeat_at)}</dd>
-        <dt>Failures</dt>
-        <dd>{monitor.consecutive_failures}</dd>
-        <dt>Enabled</dt>
-        <dd>{monitor.is_enabled ? 'Yes' : 'No'}</dd>
-        <dt>ID</dt>
-        <dd>
-          <code>{monitor.id}</code>
-        </dd>
-      </dl>
+      <div className="detail-panel">
+        <div className="row-between avail-head">
+          <h2 style={{ margin: 0 }}>Settings</h2>
+          <span className="meta mono">{monitor.type}</span>
+        </div>
+        <dl className="settings-grid">
+          <div className="settings-cell">
+            <dt>Interval</dt>
+            <dd>{monitor.interval_seconds}s</dd>
+          </div>
+          <div className="settings-cell">
+            <dt>Timeout</dt>
+            <dd>{monitor.timeout_seconds}s</dd>
+          </div>
+          {monitor.type === 'http' ? (
+            <div className="settings-cell">
+              <dt>Expected status</dt>
+              <dd>{monitor.expected_status_code}</dd>
+            </div>
+          ) : null}
+          {isHeartbeat ? (
+            <div className="settings-cell">
+              <dt>Grace</dt>
+              <dd>{monitor.heartbeat_grace_seconds}s</dd>
+            </div>
+          ) : null}
+          {monitor.type === 'udp' ? (
+            <div className="settings-cell">
+              <dt>UDP payload</dt>
+              <dd className="mono truncate">{monitor.udp_payload || 'generic probe'}</dd>
+            </div>
+          ) : null}
+          <div className="settings-cell">
+            <dt>Last check</dt>
+            <dd>{fmtTime(monitor.last_checked_at)}</dd>
+          </div>
+          {isHeartbeat ? (
+            <div className="settings-cell">
+              <dt>Last heartbeat</dt>
+              <dd>{fmtTime(monitor.last_heartbeat_at)}</dd>
+            </div>
+          ) : null}
+          <div className="settings-cell">
+            <dt>Consecutive fails</dt>
+            <dd className={monitor.consecutive_failures ? 'down' : undefined}>
+              {monitor.consecutive_failures}
+            </dd>
+          </div>
+          <div className="settings-cell">
+            <dt>Enabled</dt>
+            <dd>{monitor.is_enabled ? 'Yes' : 'No'}</dd>
+          </div>
+          <div className="settings-cell settings-cell-wide">
+            <dt>ID</dt>
+            <dd>
+              <code className="mono">{monitor.id}</code>
+            </dd>
+          </div>
+        </dl>
+      </div>
 
       <div className="detail-panel" style={{ marginTop: '1.25rem' }}>
         <div className="row-between">

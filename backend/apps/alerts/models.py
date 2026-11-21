@@ -15,6 +15,14 @@ class AlertChannel(models.Model):
         on_delete=models.CASCADE,
         related_name="alert_channels",
     )
+    # Null = main/ungrouped pulse alerts. Set = Discord (etc.) for that circuit only.
+    circuit = models.ForeignKey(
+        "monitors.Circuit",
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="alert_channels",
+    )
     name = models.CharField(max_length=200)
     type = models.CharField(max_length=20, choices=Type.choices)
     config = models.JSONField(default=dict, blank=True)
@@ -24,6 +32,9 @@ class AlertChannel(models.Model):
 
     class Meta:
         ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["circuit"]),
+        ]
 
     def __str__(self) -> str:
         return f"{self.name} ({self.type})"

@@ -111,7 +111,7 @@
         },
         {
             "name": "CSRF Trusted Origins",
-            "description": "Optional. e.g. https://thrum.example.com",
+            "description": "Optional. Example: http://abudhabi.war67.online:19101 — leave blank to auto-fill from allocation IP:port. Must match the http:// URL you open (not https).",
             "env_variable": "CSRF_TRUSTED_ORIGINS",
             "default_value": "",
             "user_viewable": true,
@@ -121,7 +121,7 @@
         },
         {
             "name": "Public Base URL",
-            "description": "Optional until alerts. Public URL for links.",
+            "description": "URL you open in the browser (http only on panel ports). Example: http://abudhabi.war67.online:19101",
             "env_variable": "THRUM_PUBLIC_BASE_URL",
             "default_value": "http://localhost",
             "user_viewable": true,

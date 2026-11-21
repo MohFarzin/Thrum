@@ -13,16 +13,18 @@ type Props = {
   health: HealthSlice | null
   size?: number
   label?: string
+  /** Hide the long ok/fail caption (circuit tiles). */
+  compact?: boolean
 }
 
-/** Quiet SVG pie — colour on data only (up=accent, down=danger). */
-export function UptimePie({ health, size = 160, label }: Props) {
+/** Thin ring — hue only on up/down arcs (achromatic chrome elsewhere). */
+export function UptimePie({ health, size = 160, label, compact = false }: Props) {
   const up = health?.up_count ?? 0
   const down = health?.down_count ?? 0
   const total = up + down
   const pct = health?.uptime_pct
   const r = size / 2
-  const stroke = Math.max(14, size * 0.14)
+  const stroke = Math.max(10, size * 0.1)
   const circ = 2 * Math.PI * (r - stroke / 2)
   const upFrac = total ? up / total : 0
   const downFrac = total ? down / total : 0
@@ -76,26 +78,30 @@ export function UptimePie({ health, size = 160, label }: Props) {
             />
           </>
         )}
-        <text x={r} y={r - 4} textAnchor="middle" className="pie-pct">
-          {pct == null ? '—' : `${pct}%`}
+        <text x={r} y={r - 2} textAnchor="middle" className="pie-pct">
+          {pct == null ? '—' : `${pct}`}
         </text>
-        <text x={r} y={r + 16} textAnchor="middle" className="pie-sub">
-          uptime
+        <text x={r} y={r + 14} textAnchor="middle" className="pie-sub">
+          {pct == null ? 'uptime' : '% up'}
         </text>
       </svg>
-      <div className="pie-caption">
-        {label ? <p className="meta">{label}</p> : null}
-        <p className="pie-summary">
-          {total === 0 ? (
-            <>No checks in this range yet.</>
-          ) : (
-            <>
-              <strong>{pct}%</strong> up · {up} ok / {down} fail · downtime{' '}
-              <strong>{health?.down_human ?? '—'}</strong>
-            </>
-          )}
-        </p>
-      </div>
+      {compact ? (
+        label ? <p className="meta pie-compact-label">{label}</p> : null
+      ) : (
+        <div className="pie-caption">
+          {label ? <p className="meta">{label}</p> : null}
+          <p className="pie-summary">
+            {total === 0 ? (
+              <>No checks in this range.</>
+            ) : (
+              <>
+                <strong>{pct}%</strong> · {up} ok / {down} fail · down{' '}
+                <strong>{health?.down_human ?? '—'}</strong>
+              </>
+            )}
+          </p>
+        </div>
+      )}
     </div>
   )
 }

@@ -11,7 +11,10 @@ export function Register() {
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
 
-  if (user) return <Navigate to="/dashboard" replace />
+  if (user) {
+    if (user.is_admin || user.is_approved) return <Navigate to="/dashboard" replace />
+    return <Navigate to="/waiting" replace />
+  }
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault()
@@ -19,7 +22,7 @@ export function Register() {
     setError('')
     try {
       await register(username, password, email)
-      navigate('/dashboard')
+      navigate('/waiting')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Registration failed')
     } finally {
@@ -31,18 +34,22 @@ export function Register() {
     <section className="form-panel">
       <p className="eyebrow">Get started</p>
       <h1>Create account</h1>
+      <p className="meta">New accounts need admin approval before monitoring is unlocked.</p>
       <form onSubmit={onSubmit}>
         <label>
           Username
-          <input value={username} onChange={(e) => setUsername(e.target.value)} required />
+          <input
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+            pattern="[A-Za-z0-9_.\-]{3,32}"
+            title="3–32 chars: letters, numbers, _ . -"
+            autoComplete="username"
+            required
+          />
         </label>
         <label>
           Email (optional)
-          <input
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-          />
+          <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
         </label>
         <label>
           Password
@@ -51,6 +58,7 @@ export function Register() {
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             minLength={8}
+            autoComplete="new-password"
             required
           />
         </label>
